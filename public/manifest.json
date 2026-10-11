@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Scribe Notes",
+  "version": "0.1.0",
+  "description": "Quickly capture and organize notes from your browser.",
+  "permissions": ["storage"],
+  "host_permissions": ["https://*.supabase.co/*"],
+  "action": {
+    "default_title": "Open Scribe Notes",
+    "default_popup": "index.html"
+  }
+}

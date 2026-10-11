@@ -1,0 +1,217 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  width: 420px;
+  height: 600px;
+  margin: 0;
+  overflow: hidden;
+}
+body {
+  min-width: 360px;
+}
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+button {
+  cursor: pointer;
+}
+button:focus-visible {
+  outline: 2px solid var(--scribe-accent, #9e8aff);
+  outline-offset: 2px;
+}
+input,
+textarea,
+select {
+  outline: none;
+}
+::selection {
+  background: #e1d9ff;
+}
+
+.scribe-app {
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--scribe-accent, #8970ed) 52%,
+      #b7b4c3
+    )
+    transparent;
+  scrollbar-width: thin;
+}
+.scribe-app.dark {
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--scribe-accent, #8970ed) 66%,
+      #55515f
+    )
+    transparent;
+}
+.scribe-app ::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+.scribe-app ::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scribe-app ::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--scribe-accent, #8970ed) 52%, #b7b4c3);
+  background-clip: padding-box;
+}
+.scribe-app.dark ::-webkit-scrollbar-thumb {
+  background-color: color-mix(
+    in srgb,
+    var(--scribe-accent, #8970ed) 66%,
+    #55515f
+  );
+}
+.scribe-app ::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scribe-accent, #8970ed);
+}
+.notes-scroll {
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--scribe-accent, #8970ed) 52%,
+      #b7b4c3
+    )
+    transparent;
+  scrollbar-width: thin;
+}
+.dark .notes-scroll {
+  scrollbar-color: color-mix(
+      in srgb,
+      var(--scribe-accent, #8970ed) 66%,
+      #55515f
+    )
+    transparent;
+}
+.notes-scroll::-webkit-scrollbar {
+  width: 7px;
+}
+.notes-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.notes-scroll::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--scribe-accent, #8970ed) 52%, #b7b4c3);
+  background-clip: padding-box;
+}
+.dark .notes-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(
+    in srgb,
+    var(--scribe-accent, #8970ed) 66%,
+    #55515f
+  );
+}
+.notes-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scribe-accent, #8970ed);
+}
+.folder-filter-scroll {
+  overscroll-behavior-x: contain;
+}
+.folder-filter-scroll::-webkit-scrollbar {
+  display: none;
+}
+.scribe-tooltip {
+  position: fixed;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  width: max-content;
+  max-width: min(220px, calc(100vw - 16px));
+  padding: 7px 10px;
+  border: 1px solid;
+  border-radius: 9px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  animation: tooltipIn 0.14s ease-out both;
+}
+.scribe-tooltip i {
+  position: absolute;
+  left: 50%;
+  bottom: -4px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid;
+  border-bottom: 1px solid;
+  transform: translateX(-50%) rotate(45deg);
+}
+.scribe-tooltip[data-placement="below"] i {
+  top: -4px;
+  bottom: auto;
+  transform: translateX(-50%) rotate(225deg);
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes tooltipIn {
+  from {
+    opacity: 0;
+    scale: 0.94;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+  }
+}
+@keyframes mascotPeek {
+  from {
+    opacity: 0;
+    transform: translateY(-9px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes mascotTuck {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-7px) scale(0.96);
+  }
+}
+.scribe-mascot {
+  animation: mascotBob 1.8s ease-in-out infinite;
+}
+@keyframes mascotBob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-2px) rotate(2deg);
+  }
+}
