@@ -58,6 +58,8 @@ The extension stores a pending local outbox and sync cursor per account in Index
 
 In Supabase Dashboard → **Authentication → Providers**, enable Google and GitHub with the provider credentials already configured for the Windows app. Keep each provider's callback URL set to Supabase's hosted callback (`https://<project-ref>.supabase.co/auth/v1/callback`).
 
+To allow users to link or unlink Google and GitHub identities, enable **Manual Linking** in Supabase Dashboard under **Authentication → Settings** (the exact placement may vary with the dashboard layout). The extension uses Supabase's PKCE flow for this feature. Unlinking is available only while the account has at least one other sign-in identity.
+
 For extension OAuth, add the extension's Chrome Identity redirect URL under **Authentication → URL Configuration → Redirect URLs**:
 
 1. Load the built extension from `dist` in `chrome://extensions` and copy its **ID** from the extension card.

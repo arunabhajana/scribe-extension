@@ -11,7 +11,7 @@ import { ContextMenu, type ContextMenuItem } from "./components/ContextMenu";
 import { noteFontFamilies, noteFontFamilyCss, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "./data/noteFontSizes";
 import type { Folder, Note, Screen } from "./types";
 import { supabase } from "./lib/supabase";
-import { completeOAuthCallback, oauthCallbackStorageKey, signInWithProvider as startProviderSignIn } from "./lib/oauth";
+import { completeOAuthCallback, linkProviderIdentity, oauthCallbackStorageKey, signInWithProvider as startProviderSignIn, type SocialProvider } from "./lib/oauth";
 import { loadAccount, syncAccount, updateAccountCache, type AccountCache } from "./data/cloudSync";
 
 function readLocal<T>(key: string, fallback: T): T {
@@ -355,6 +355,23 @@ export default function App() {
     if (!supabase) return "Supabase is not configured.";
     const { error } = await supabase.auth.resend({ type: "signup", email });
     return error?.message ?? null;
+  }
+  async function unlinkProviderIdentity(provider: SocialProvider): Promise<string | null> {
+    if (!supabase) return "Supabase is not configured.";
+    const { data, error } = await supabase.auth.getUserIdentities();
+    if (error) return error.message;
+    const identity = data.identities.find((item) => item.provider === provider);
+    if (!identity) return `No ${provider} identity is linked to this account.`;
+    if (data.identities.length <= 1) return "Link another sign-in method before unlinking this one.";
+    const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity);
+    if (unlinkError) return unlinkError.message;
+    const { data: userData, error: userError } = await supabase.auth.getUser();
+    if (userError) return userError.message;
+    if (userData.user) {
+      setAuthUser(userData.user);
+      syncProfile(userData.user);
+    }
+    return null;
   }
   const orderedFolderKeys = useMemo(() => {
     const available = [
@@ -803,6 +820,9 @@ export default function App() {
                 provider: identity.provider,
                 email: typeof identity.identity_data?.email === "string" ? identity.identity_data.email : undefined,
               })) ?? []}
+            linkedIdentityCount={authUser?.identities?.length ?? 0}
+            onLinkAccount={linkProviderIdentity}
+            onUnlinkAccount={unlinkProviderIdentity}
           />
         )}
         {!authLoading && screen === "auth" && (

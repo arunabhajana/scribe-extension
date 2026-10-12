@@ -43,6 +43,9 @@ type Props = {
   avatar: string;
   setAvatar: (avatar: string) => void;
   linkedAccounts: { provider: string; name?: string; email?: string }[];
+  linkedIdentityCount: number;
+  onLinkAccount: (provider: "google" | "github") => Promise<string | null>;
+  onUnlinkAccount: (provider: "google" | "github") => Promise<string | null>;
 };
 
 type MockDevice = {
@@ -110,13 +113,14 @@ export function SettingsView({
   avatar,
   setAvatar,
   linkedAccounts,
+  linkedIdentityCount,
+  onLinkAccount,
+  onUnlinkAccount,
 }: Props) {
   const [active, setActive] = useState("account");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const [linkedProviders, setLinkedProviders] = useState<Set<string>>(
-    () => new Set(linkedAccounts.filter((item) => ["google", "github"].includes(item.provider)).map((item) => item.provider)),
-  );
+  const [providerPending, setProviderPending] = useState<"google" | "github" | null>(null);
   const [devices, setDevices] = useState(initialMockDevices);
   const current =
     categories.find((category) => category.id === active) ?? categories[0];
@@ -175,15 +179,12 @@ export function SettingsView({
     setSearch("");
     setSearchOpen(false);
   }
-  function toggleProvider(provider: "google" | "github") {
-    const wasLinked = linkedProviders.has(provider);
-    setLinkedProviders((current) => {
-      const next = new Set(current);
-      if (wasLinked) next.delete(provider);
-      else next.add(provider);
-      return next;
-    });
-    onMessage(`${provider === "google" ? "Google" : "GitHub"} ${wasLinked ? "unlinked" : "linked"} in this preview. Your Supabase account was not changed.`);
+  async function toggleProvider(provider: "google" | "github", isLinked: boolean) {
+    setProviderPending(provider);
+    const error = await (isLinked ? onUnlinkAccount(provider) : onLinkAccount(provider));
+    setProviderPending(null);
+    const providerName = provider === "google" ? "Google" : "GitHub";
+    onMessage(error ?? `${providerName} ${isLinked ? "account unlinked" : "account linked"}.`);
   }
   function signOutMockDevice(device: MockDevice) {
     setDevices((current) => current.filter((item) => item.id !== device.id));
@@ -447,11 +448,12 @@ export function SettingsView({
             </SettingsCard>
             <SettingsCard
               title="Linked accounts"
-              subtitle="Preview controls · changes do not update Supabase."
+              subtitle="Connect providers to sign in to this account."
               accent={current.color}
             >
               {(["google", "github"] as const).map((provider) => {
-                const isLinked = linkedProviders.has(provider);
+                const isLinked = linkedAccounts.some((item) => item.provider === provider);
+                const cannotUnlink = isLinked && linkedIdentityCount <= 1;
                 const providerName = provider === "google" ? "Google" : "GitHub";
                 const identity = linkedAccounts.find((item) => item.provider === provider);
                 return (
@@ -467,10 +469,12 @@ export function SettingsView({
                     </span>
                     <button
                       type="button"
-                      onClick={() => toggleProvider(provider)}
+                      disabled={providerPending !== null || cannotUnlink}
+                      title={cannotUnlink ? "Keep at least one sign-in method linked to your account." : undefined}
+                      onClick={() => void toggleProvider(provider, isLinked)}
                       className={`h-[29px] shrink-0 rounded-lg border px-2.5 text-[9px] font-semibold transition hover:-translate-y-px ${isLinked ? "border-[#e5c8ca] text-[#bb5963] hover:bg-[#fff2f2] dark:border-[#51353a] dark:hover:bg-[#342327]" : "border-[var(--scribe-accent)]/40 text-[var(--scribe-accent)] hover:bg-[color-mix(in_srgb,var(--scribe-accent)_8%,transparent)]"}`}
                     >
-                      {isLinked ? "Unlink" : "Link"}
+                      {providerPending === provider ? "Working…" : isLinked ? "Unlink" : "Link"}
                     </button>
                   </div>
                 );

@@ -9,7 +9,7 @@ type OAuthLaunchResult = {
   error?: string;
 };
 
-export async function signInWithProvider(provider: SocialProvider): Promise<string | null> {
+async function startProviderOAuth(provider: SocialProvider, linkIdentity: boolean): Promise<string | null> {
   if (!supabase) return "Supabase is not configured.";
   if (typeof chrome === "undefined" || !chrome.identity || !chrome.runtime?.sendMessage) {
     return "Google and GitHub sign-in are available in the installed extension, not the web preview.";
@@ -17,15 +17,15 @@ export async function signInWithProvider(provider: SocialProvider): Promise<stri
 
   try {
     const redirectTo = chrome.identity.getRedirectURL("auth");
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: {
-        redirectTo,
-        skipBrowserRedirect: true,
-        scopes: provider === "github" ? "read:user user:email" : "openid email profile",
-        ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : {}),
-      },
-    });
+    const options = {
+      redirectTo,
+      skipBrowserRedirect: true,
+      scopes: provider === "github" ? "read:user user:email" : "openid email profile",
+      ...(provider === "google" ? { queryParams: { prompt: "select_account" } } : {}),
+    };
+    const { data, error } = linkIdentity
+      ? await supabase.auth.linkIdentity({ provider, options })
+      : await supabase.auth.signInWithOAuth({ provider, options });
     if (error) return error.message;
     if (!data.url) return "Supabase did not return a provider sign-in URL.";
 
@@ -45,6 +45,14 @@ export async function signInWithProvider(provider: SocialProvider): Promise<stri
   } catch (error) {
     return error instanceof Error ? error.message : "Could not start provider sign-in. Please try again.";
   }
+}
+
+export function signInWithProvider(provider: SocialProvider): Promise<string | null> {
+  return startProviderOAuth(provider, false);
+}
+
+export function linkProviderIdentity(provider: SocialProvider): Promise<string | null> {
+  return startProviderOAuth(provider, true);
 }
 
 export async function completeOAuthCallback(callbackUrl: string): Promise<string | null> {

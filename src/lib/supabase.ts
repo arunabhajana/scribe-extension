@@ -12,7 +12,7 @@ export const supabase = supabaseConfigured
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: false,
-        flowType: "implicit",
+        flowType: "pkce",
         persistSession: true,
         storage: typeof chrome !== "undefined" && chrome.storage?.local
           ? {
