@@ -16,15 +16,17 @@ import {
 } from "lucide-react";
 import type { Folder, Screen } from "../types";
 import { FolderSettings } from "./FolderSettings";
-import { noteFontSizes } from "../data/noteFontSizes";
+import { noteFontFamilies, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "../data/noteFontSizes";
 
 type Props = {
   dark: boolean;
   accent: string;
   folders: Folder[];
   folderOrder: string[];
-  noteFontSize: number;
-  onNoteFontSizeChange: (size: number) => void;
+  noteFontSize: NoteFontSize;
+  onNoteFontSizeChange: (size: NoteFontSize) => void;
+  noteFontFamily: NoteFontFamily;
+  onNoteFontFamilyChange: (family: NoteFontFamily) => void;
   onCreateFolder: (folder: Folder) => void;
   onUpdateFolder: (id: string, folder: Folder) => void;
   onDeleteFolder: (folder: Folder) => void;
@@ -75,6 +77,8 @@ export function SettingsView({
   folderOrder,
   noteFontSize,
   onNoteFontSizeChange,
+  noteFontFamily,
+  onNoteFontFamilyChange,
   onCreateFolder,
   onUpdateFolder,
   onDeleteFolder,
@@ -109,8 +113,8 @@ export function SettingsView({
       category: "appearance",
     },
     {
-      label: "Reading text size",
-      detail: "Adjust note view font size",
+      label: "Typography",
+      detail: "Choose a font family and text size for notes",
       category: "appearance",
     },
     {
@@ -371,38 +375,29 @@ export function SettingsView({
               </div>
             </SettingsCard>
             <SettingsCard
-              title="Reading text size"
-              subtitle="Choose a comfortable size for note titles and text."
+              title="Typography"
+              subtitle="Choose a comfortable typeface and size for your notes."
               accent={current.color}
             >
-              <div className="flex gap-1.5 py-3">
-                {noteFontSizes.map((option, index) => (
-                  <button
-                    key={option.label}
-                    aria-label={`${option.label} reading text size`}
-                    aria-pressed={noteFontSize === index}
-                    className="flex min-w-0 flex-1 flex-col items-center gap-1 rounded-lg border px-1 py-2 text-center transition hover:-translate-y-px"
-                    style={{
-                      color: noteFontSize === index ? accent : undefined,
-                      borderColor:
-                        noteFontSize === index
-                          ? `${accent}88`
-                          : dark
-                            ? "#3a3941"
-                            : "#e9e7ed",
-                      backgroundColor:
-                        noteFontSize === index ? `${accent}16` : "transparent",
-                    }}
-                    onClick={() => onNoteFontSizeChange(index)}
-                  >
-                    <span className="truncate text-[8px] font-semibold">
-                      {["XS", "S", "M", "L", "XL"][index]}
-                    </span>
-                    <span className="text-[8px] text-[#6f6d7b]">
-                      {option.size}px
-                    </span>
-                  </button>
-                ))}
+              <div className="divide-y divide-[#e8e5ed] py-1 dark:divide-[#35343b]">
+                <TypographySelect
+                  label="Font family"
+                  detail="Choose the voice of your notes."
+                  value={noteFontFamily}
+                  options={noteFontFamilies}
+                  dark={dark}
+                  accent={current.color}
+                  onChange={(value) => onNoteFontFamilyChange(value as NoteFontFamily)}
+                />
+                <TypographySelect
+                  label="Text size"
+                  detail="Adjust reading and editor text."
+                  value={noteFontSize}
+                  options={noteFontSizes.map((option) => option.label)}
+                  dark={dark}
+                  accent={current.color}
+                  onChange={(value) => onNoteFontSizeChange(value as NoteFontSize)}
+                />
               </div>
             </SettingsCard>
           </>
@@ -652,5 +647,43 @@ function SettingRow({
         <ActionIcon size={13} />
       </span>
     </button>
+  );
+}
+
+function TypographySelect({
+  label,
+  detail,
+  value,
+  options,
+  dark,
+  accent,
+  onChange,
+}: {
+  label: string;
+  detail: string;
+  value: string;
+  options: readonly string[];
+  dark: boolean;
+  accent: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex min-h-[59px] items-center gap-2.5 py-2.5">
+      <span className="min-w-0 flex-1">
+        <strong className="block text-[10px] font-semibold">{label}</strong>
+        <span className="mt-1 block text-[9px] leading-4 text-[#6f6d7b]">
+          {detail}
+        </span>
+      </span>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className={`h-[33px] max-w-[145px] min-w-[105px] rounded-[9px] border px-2 text-[9px] outline-none transition focus:ring-2 ${dark ? "border-[#3a3941] bg-[#222128] text-[#e9e6f1]" : "border-[#dedbe5] bg-[#f8f7fa] text-[#45434f]"}`}
+        style={{ borderColor: `${accent}55`, "--tw-ring-color": `${accent}28` } as React.CSSProperties}
+      >
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+      </select>
+    </div>
   );
 }

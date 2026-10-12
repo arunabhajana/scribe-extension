@@ -45,7 +45,7 @@ function applyMark(content: ReactNode, mark: TextMark, key: number): ReactNode {
 function renderBlock(node: RichTextNode, index: number): ReactNode {
   if (node.type === "legacyMarkdown")
     return (
-      <pre key={index} className="whitespace-pre-wrap break-words font-sans">
+      <pre key={index} className="whitespace-pre-wrap break-words">
         {node.text}
       </pre>
     );

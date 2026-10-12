@@ -17,6 +17,7 @@ type Props = {
   accent: string;
   dark: boolean;
   fontSize: number;
+  fontFamily: string;
   onBack: () => void;
   onEdit: (field?: "title" | "body") => void;
   onDelete: () => void;
@@ -31,6 +32,7 @@ export function NoteViewer({
   accent,
   dark,
   fontSize,
+  fontFamily,
   onBack,
   onEdit,
   onDelete,
@@ -166,7 +168,7 @@ export function NoteViewer({
         {note.isDeleted ? (
           <div
             className="break-words font-semibold tracking-[-.45px]"
-            style={{ fontSize: `${fontSize * 1.42}px`, lineHeight: 1.2 }}
+            style={{ fontSize: `${fontSize * 1.42}px`, lineHeight: 1.2, fontFamily }}
           >
             {note.title || "Untitled note"}
           </div>
@@ -177,6 +179,7 @@ export function NoteViewer({
               color: "inherit",
               fontSize: `${fontSize * 1.42}px`,
               lineHeight: 1.2,
+              fontFamily,
             }}
             onClick={() => onEdit("title")}
           >
@@ -201,7 +204,7 @@ export function NoteViewer({
         onClick={() => !note.isDeleted && onEdit("body")}
         onKeyDown={note.isDeleted ? undefined : editFromBody}
         className={`group min-h-0 flex-1 overflow-y-auto rounded-[13px] border border-[#e2dfe8] bg-[#f1eff5] p-3.5 ${note.isDeleted ? "" : "cursor-text text-left transition hover:border-[color-mix(in_srgb,var(--scribe-accent)_36%,transparent)] hover:bg-[color-mix(in_srgb,var(--scribe-accent)_5%,transparent)] focus-visible:border-[var(--scribe-accent)]"} dark:border-[#34333c] dark:bg-[#202026] dark:text-[#dedce9]`}
-        style={{ fontSize }}
+        style={{ fontSize, fontFamily }}
       >
         {!note.isDeleted && (
           <div className="mb-2 flex justify-end">

@@ -24,6 +24,7 @@ type Props = {
   dark: boolean;
   focusField: "title" | "body";
   fontSize: number;
+  fontFamily: string;
   onBack: () => void;
   onDiscard: () => void;
   onDelete: () => void;
@@ -40,6 +41,7 @@ export function NoteEditor({
   dark,
   focusField,
   fontSize,
+  fontFamily,
   onBack,
   onDiscard,
   onDelete,
@@ -106,7 +108,7 @@ export function NoteEditor({
       </div>
       <input
         ref={titleRef}
-        style={{ fontSize: fontSize + 1 }}
+        style={{ fontSize: fontSize + 1, fontFamily }}
         className="h-12 shrink-0 rounded-[11px] border border-[#e5e3ed] bg-transparent px-3 font-medium tracking-[-.35px] outline-none transition focus:border-[var(--editor-accent)] focus:shadow-[0_0_0_3px_color-mix(in_srgb,var(--editor-accent)_16%,transparent)] dark:border-[#3b3944]"
         aria-label="Note title"
         value={note?.title ?? ""}
@@ -259,7 +261,7 @@ export function NoteEditor({
       </div>
       <textarea
         ref={bodyRef}
-        style={{ fontSize }}
+        style={{ fontSize, fontFamily }}
         className="min-h-[100px] flex-1 resize-none rounded-b-[10px] border border-t-0 border-[#e9e7ef] bg-transparent p-[13px] leading-[1.8] text-[#464655] outline-none transition focus:border-[var(--editor-accent)] focus:shadow-[inset_0_0_0_1px_var(--editor-accent)] dark:border-[#3b3944] dark:text-[#dedce9]"
         aria-label="Note content"
         value={note?.body ?? ""}

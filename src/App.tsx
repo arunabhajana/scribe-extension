@@ -8,7 +8,7 @@ import { NoteViewer } from "./components/NoteViewer";
 import { SettingsView } from "./components/SettingsView";
 import { AuthView } from "./components/AuthView";
 import { ContextMenu, type ContextMenuItem } from "./components/ContextMenu";
-import { noteFontSizes } from "./data/noteFontSizes";
+import { noteFontFamilies, noteFontFamilyCss, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "./data/noteFontSizes";
 import type { Folder, Note, Screen } from "./types";
 import { supabase } from "./lib/supabase";
 import { completeOAuthCallback, oauthCallbackStorageKey, signInWithProvider as startProviderSignIn } from "./lib/oauth";
@@ -69,19 +69,26 @@ export default function App() {
   const [dark, setDark] = useState(
     () => localStorage.getItem("scribe-theme") === "dark",
   );
-  const [noteFontSize, setNoteFontSize] = useState(() => {
-    const stored = Number(localStorage.getItem("scribe-note-font-size"));
-    return Number.isInteger(stored) &&
-      stored >= 0 &&
-      stored < noteFontSizes.length
-      ? stored
-      : 2;
+  const [noteFontSize, setNoteFontSize] = useState<NoteFontSize>(() => {
+    const stored = localStorage.getItem("scribe-note-font-size");
+    if (stored !== null) {
+      if (noteFontSizes.some((option) => option.label === stored)) return stored as NoteFontSize;
+      const legacyIndex = Number(stored);
+      if (Number.isInteger(legacyIndex) && legacyIndex >= 0 && legacyIndex <= 4)
+        return legacyIndex <= 1 ? "Small" : legacyIndex === 2 ? "Medium" : "Large";
+    }
+    return "Medium";
+  });
+  const [noteFontFamily, setNoteFontFamily] = useState<NoteFontFamily>(() => {
+    const stored = localStorage.getItem("scribe-note-font-family");
+    return noteFontFamilies.find((family) => family === stored) ?? "DM Sans";
   });
   const [saved, setSaved] = useState(true);
   const [editField, setEditField] = useState<"title" | "body">("body");
   const [syncStatus, setSyncStatus] = useState<"pending" | "syncing" | "synced" | "error">("synced");
   const [filterPinned, setFilterPinned] = useState(false);
   const [message, setMessage] = useState("");
+  const selectedNoteFontSize = noteFontSizes.find((option) => option.label === noteFontSize)?.size ?? 13;
   const selected = useMemo(
     () => notes.find((note) => note.id === selectedId),
     [notes, selectedId],
@@ -726,7 +733,8 @@ export default function App() {
             folders={folders}
             accent={accent}
             dark={dark}
-            fontSize={noteFontSizes[noteFontSize].size}
+            fontSize={selectedNoteFontSize}
+            fontFamily={noteFontFamilyCss[noteFontFamily]}
             onBack={() => setScreen("notes")}
             onEdit={editNote}
             onDelete={deleteNote}
@@ -746,7 +754,8 @@ export default function App() {
             accent={accent}
             dark={dark}
             focusField={editField}
-            fontSize={noteFontSizes[noteFontSize].size}
+            fontSize={selectedNoteFontSize}
+            fontFamily={noteFontFamilyCss[noteFontFamily]}
             onBack={leaveEditor}
             onDiscard={discardDraft}
             onDelete={deleteNote}
@@ -764,7 +773,12 @@ export default function App() {
             noteFontSize={noteFontSize}
             onNoteFontSizeChange={(size) => {
               setNoteFontSize(size);
-              localStorage.setItem("scribe-note-font-size", String(size));
+              localStorage.setItem("scribe-note-font-size", size);
+            }}
+            noteFontFamily={noteFontFamily}
+            onNoteFontFamilyChange={(family) => {
+              setNoteFontFamily(family);
+              localStorage.setItem("scribe-note-font-family", family);
             }}
             onCreateFolder={createFolder}
             onUpdateFolder={updateFolder}
