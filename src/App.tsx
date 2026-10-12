@@ -642,13 +642,21 @@ export default function App() {
     setScreen("notes");
     setMessage("Your notes were cleared.");
   }
-  function updateProfileName(name: string) {
-    setProfileName(name);
-    localStorage.setItem("scribe-profile-name", name);
-    if (supabase) {
-      void supabase.auth.updateUser({ data: { display_name: name.trim() } }).then(({ error }) => {
-        if (error) setMessage("Could not update your account name. Please try again.");
-      }).catch(() => setMessage("Could not update your account name. Check your connection."));
+  async function updateProfileName(name: string): Promise<string | null> {
+    const displayName = name.trim();
+    if (!displayName || displayName.length > 40) return "Enter a name between 1 and 40 characters.";
+    if (!authUser || !supabase) return "Sign in again before saving your display name.";
+    try {
+      const { error: profileError } = await supabase.from("profiles")
+        .upsert({ user_id: authUser.id, display_name: displayName }, { onConflict: "user_id" });
+      if (profileError) return "Could not save your profile. Please try again.";
+      const { error } = await supabase.auth.updateUser({ data: { display_name: displayName } });
+      if (error) return "Your profile was saved, but Scribe could not refresh the account name. Please try again.";
+      setProfileName(displayName);
+      localStorage.setItem("scribe-profile-name", displayName);
+      return null;
+    } catch {
+      return "Could not save your display name. Check your connection and try again.";
     }
   }
   function updateProfileAvatar(avatar: string) {
@@ -836,7 +844,7 @@ export default function App() {
             onMessage={setMessage}
             name={profileName}
             email={profileEmail}
-            setName={updateProfileName}
+            onSaveName={updateProfileName}
             avatar={profileAvatar}
             setAvatar={updateProfileAvatar}
             linkedAccounts={linkedIdentities
@@ -854,8 +862,7 @@ export default function App() {
           <AuthView
             dark={dark}
             accent={accent}
-            onAuthenticated={(accountName, accountEmail) => {
-              if (accountName) updateProfileName(accountName);
+            onAuthenticated={(_accountName, accountEmail) => {
               if (accountEmail) localStorage.setItem("scribe-profile-email", accountEmail);
               setScreen("notes");
               setMessage("You’re signed in. Your notes are ready.");

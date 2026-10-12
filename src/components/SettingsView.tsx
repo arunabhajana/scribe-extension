@@ -1,7 +1,6 @@
 import { useState } from "react";
 import {
   ArrowLeft,
-  Camera,
   Database,
   Globe,
   FolderOpen,
@@ -39,7 +38,7 @@ type Props = {
   onMessage: (message: string) => void;
   name: string;
   email: string;
-  setName: (name: string) => void;
+  onSaveName: (name: string) => Promise<string | null>;
   avatar: string;
   setAvatar: (avatar: string) => void;
   linkedAccounts: { provider: string; name?: string; email?: string }[];
@@ -109,7 +108,7 @@ export function SettingsView({
   onMessage,
   name,
   email,
-  setName,
+  onSaveName,
   avatar,
   setAvatar,
   linkedAccounts,
@@ -121,10 +120,31 @@ export function SettingsView({
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [providerPending, setProviderPending] = useState<"google" | "github" | null>(null);
+  const [nameDraft, setNameDraft] = useState(name);
+  const [savingName, setSavingName] = useState(false);
   const [devices, setDevices] = useState(initialMockDevices);
   const current =
     categories.find((category) => category.id === active) ?? categories[0];
   const Icon = current.icon;
+
+  async function saveDisplayName() {
+    const nextName = nameDraft.trim();
+    if (!nextName || nextName.length > 40) {
+      onMessage("Enter a name between 1 and 40 characters.");
+      return;
+    }
+    if (nextName === name.trim()) return;
+    setSavingName(true);
+    try {
+      const error = await onSaveName(nextName);
+      if (error) onMessage(error);
+      else onMessage("Display name updated.");
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : "Could not update your display name.");
+    } finally {
+      setSavingName(false);
+    }
+  }
   const settingsMatches = [
     {
       label: "Theme",
@@ -406,21 +426,30 @@ export function SettingsView({
                   }}
                 >
                   {name.trim().charAt(0).toUpperCase() || "A"}
-                  <Camera
-                    className="absolute -bottom-1 -right-1 rounded-full bg-white p-1 shadow dark:bg-[#282730]"
-                    style={{ color: accent }}
-                    size={18}
-                  />
                 </span>
                 <div className="min-w-0 flex-1">
                   <label className="mb-1 block text-[9px] font-semibold text-[#686674]">Display name</label>
-                  <input
-                    value={name}
-                    maxLength={40}
-                    onChange={(event) => setName(event.target.value)}
-                    className="h-9 w-full rounded-lg border border-[#e7e5ed] bg-transparent px-2.5 text-[11px] outline-none focus:border-[var(--scribe-accent)] dark:border-[#3a3941]"
-                    placeholder="Your name"
-                  />
+                  <div className="flex gap-1.5">
+                    <input
+                      value={nameDraft}
+                      maxLength={40}
+                      disabled={savingName}
+                      onChange={(event) => setNameDraft(event.target.value)}
+                      onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void saveDisplayName(); } }}
+                      className="h-9 min-w-0 flex-1 rounded-lg border border-[#e7e5ed] bg-transparent px-2.5 text-[11px] outline-none focus:border-[var(--scribe-accent)] dark:border-[#3a3941]"
+                      placeholder="Your name"
+                      aria-label="Display name"
+                    />
+                    <button
+                      type="button"
+                      disabled={savingName || !nameDraft.trim() || nameDraft.trim() === name.trim()}
+                      onClick={() => void saveDisplayName()}
+                      className="rounded-lg px-2.5 text-[10px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                      style={{ backgroundColor: accent }}
+                    >
+                      {savingName ? "Saving…" : "Save"}
+                    </button>
+                  </div>
                 </div>
               </div>
               <p className="pb-2 text-[9px] text-[#6f6d7b]">{email || "Email unavailable"}</p>
@@ -444,7 +473,8 @@ export function SettingsView({
                         backgroundColor: color,
                         ["--tw-ring-color" as string]: accent,
                       }}
-                      aria-label="Choose avatar color"
+                      aria-label={`Choose avatar color ${color}`}
+                      aria-pressed={avatar === color}
                       onClick={() => setAvatar(color)}
                     />
                   ))}
