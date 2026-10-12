@@ -11,7 +11,7 @@ Scribe is a lightweight Chrome extension for capturing, organizing, and editing 
 - Batched cloud sync with offline queuing, cursor-based change pulls, retries, and conflict copies.
 - Supabase Realtime wakeups for quick remote updates, with periodic sync as a fallback.
 - Notes, folders, drafts, trash, pinning, Markdown preview, and customizable appearance.
-- Google and GitHub sign-in buttons are visual placeholders and are not connected yet.
+- Supabase Google and GitHub OAuth sign-in through Chrome Identity.
 
 ## Requirements
 
@@ -56,9 +56,17 @@ Apply the Scribe database migrations from the [scribe-backend repository](https:
 
 The extension stores a pending local outbox and sync cursor per account in IndexedDB. It sends writes in batches of up to 50 operations, pulls remote changes on startup and when notified, and retains a 60-second periodic pull as a fallback. Cloud sync pauses while the note body is actively being edited and resumes when editing ends. Realtime requires the second migration; without it, the periodic and focus/reconnect sync still work.
 
-In Supabase Dashboard → **Authentication → URL Configuration**, configure email confirmation according to your project. The popup may close while the user verifies their email; they can then reopen Scribe and sign in. The current flow uses Supabase's hosted confirmation page and does not require a custom domain or extension ID.
+In Supabase Dashboard → **Authentication → Providers**, enable Google and GitHub with the provider credentials already configured for the Windows app. Keep each provider's callback URL set to Supabase's hosted callback (`https://<project-ref>.supabase.co/auth/v1/callback`).
 
-The extension requests Chrome's `storage` permission for the Supabase session and access to `https://*.supabase.co/*` for Supabase API calls. If your project uses a custom API domain, add it to `host_permissions` in `public/manifest.json`.
+For extension OAuth, add the extension's Chrome Identity redirect URL under **Authentication → URL Configuration → Redirect URLs**:
+
+1. Load the built extension from `dist` in `chrome://extensions` and copy its **ID** from the extension card.
+2. Add `https://<EXTENSION_ID>.chromiumapp.org/auth` to Supabase's allowed redirect URLs, replacing `<EXTENSION_ID>` with that ID.
+3. Rebuild/reload after changing the extension ID or loading it from a different unpacked path, and update the allowed URL to match.
+
+The extension calls `chrome.identity.getRedirectURL("auth")` to construct this URL and handles the OAuth return in its Manifest V3 service worker, so the flow survives the popup closing during Google/GitHub sign-in. The provider still returns to Supabase first; the Supabase callback URL above does not change. Email confirmation continues to use Supabase's hosted confirmation page.
+
+The extension requests Chrome's `storage` permission for the Supabase session and OAuth callback, `identity` for the provider flow, and access to `https://*.supabase.co/*` for Supabase API calls. If your project uses a custom API domain, add it to `host_permissions` in `public/manifest.json`.
 
 ## Development commands
 

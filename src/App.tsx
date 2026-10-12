@@ -11,6 +11,7 @@ import { ContextMenu, type ContextMenuItem } from "./components/ContextMenu";
 import { noteFontSizes } from "./data/noteFontSizes";
 import type { Folder, Note, Screen } from "./types";
 import { supabase } from "./lib/supabase";
+import { completeOAuthCallback, oauthCallbackStorageKey, signInWithProvider as startProviderSignIn } from "./lib/oauth";
 import { loadAccount, syncAccount, updateAccountCache, type AccountCache } from "./data/cloudSync";
 
 function readLocal<T>(key: string, fallback: T): T {
@@ -149,6 +150,20 @@ export default function App() {
       if (mounted) { setAuthError("Could not restore your session. Please sign in again."); setScreen("auth"); setAuthLoading(false); }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
+
+  useEffect(() => {
+    if (!supabase || typeof chrome === "undefined" || !chrome.storage?.local) return;
+    let active = true;
+    void chrome.storage.local.get(oauthCallbackStorageKey).then(async (result) => {
+      const callbackUrl = result[oauthCallbackStorageKey];
+      if (!active || typeof callbackUrl !== "string") return;
+      const error = await completeOAuthCallback(callbackUrl);
+      if (active && error) setAuthError(error);
+    }).catch(() => {
+      if (active) setAuthError("Could not restore the provider sign-in. Please try again.");
+    });
+    return () => { active = false; };
   }, []);
 
   useEffect(() => {
@@ -784,6 +799,7 @@ export default function App() {
               setMessage("You’re signed in. Your notes are ready.");
             }}
             onSignIn={signIn}
+            onSignInWithProvider={startProviderSignIn}
             onRegister={async (name, email, password) => {
               const result = await register(name, email, password);
               return result;

@@ -17,10 +17,11 @@ type Props = {
   onRegister: (name: string, email: string, password: string) => Promise<{ error: string | null; confirmationRequired: boolean }>;
   onResendVerification: (email: string) => Promise<string | null>;
   onSignIn: (email: string, password: string) => Promise<string | null>;
+  onSignInWithProvider: (provider: "google" | "github") => Promise<string | null>;
   onMessage: (message: string) => void;
 };
 
-export function AuthView({ dark, accent, onAuthenticated, onRegister, onResendVerification, onSignIn, onMessage }: Props) {
+export function AuthView({ dark, accent, onAuthenticated, onRegister, onResendVerification, onSignIn, onSignInWithProvider, onMessage }: Props) {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -28,11 +29,26 @@ export function AuthView({ dark, accent, onAuthenticated, onRegister, onResendVe
   const [name, setName] = useState("");
   const [remember, setRemember] = useState(true);
   const [pending, setPending] = useState(false);
+  const [socialPending, setSocialPending] = useState<"google" | "github" | null>(null);
   const [error, setError] = useState("");
   const [verificationPending, setVerificationPending] = useState(false);
   const [lastEmail, setLastEmail] = useState("");
   const [notice, setNotice] = useState("");
   const registering = mode === "register";
+
+  async function signInWithProvider(provider: "google" | "github") {
+    setError("");
+    setNotice("");
+    setSocialPending(provider);
+    try {
+      const message = await onSignInWithProvider(provider);
+      if (message) setError(message);
+    } catch {
+      setError(`Could not sign in with ${provider === "google" ? "Google" : "GitHub"}. Please try again.`);
+    } finally {
+      setSocialPending(null);
+    }
+  }
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,8 +116,8 @@ export function AuthView({ dark, accent, onAuthenticated, onRegister, onResendVe
       </div>
 
       <div className="mx-auto mt-[16px] flex w-full max-w-[330px] gap-2">
-        <button type="button" disabled className={`flex h-[36px] flex-1 items-center justify-center gap-2 rounded-[10px] border text-[9px] font-semibold opacity-70 ${dark ? "border-[#3a3944] bg-[#222128]" : "border-[#dfdce6] bg-[#fdfcff]"}`} title="Google sign-in is not connected yet"><GoogleLogo /> Google <span className="text-[8px] font-medium text-[#777582]">Soon</span></button>
-        <button type="button" disabled className={`flex h-[36px] flex-1 items-center justify-center gap-2 rounded-[10px] border text-[9px] font-semibold opacity-70 ${dark ? "border-[#3a3944] bg-[#222128]" : "border-[#dfdce6] bg-[#fdfcff]"}`} title="GitHub sign-in is not connected yet"><GitHubLogo dark={dark} /> GitHub <span className="text-[8px] font-medium text-[#777582]">Soon</span></button>
+        <button type="button" disabled={pending || socialPending !== null} onClick={() => void signInWithProvider("google")} className={`flex h-[36px] flex-1 items-center justify-center gap-2 rounded-[10px] border text-[9px] font-semibold transition hover:border-[var(--scribe-accent)]/50 hover:bg-black/[.025] disabled:cursor-wait disabled:opacity-60 dark:hover:bg-white/[.035] ${dark ? "border-[#3a3944] bg-[#222128]" : "border-[#dfdce6] bg-[#fdfcff]"}`}><GoogleLogo /> {socialPending === "google" ? "Connecting…" : "Google"}</button>
+        <button type="button" disabled={pending || socialPending !== null} onClick={() => void signInWithProvider("github")} className={`flex h-[36px] flex-1 items-center justify-center gap-2 rounded-[10px] border text-[9px] font-semibold transition hover:border-[var(--scribe-accent)]/50 hover:bg-black/[.025] disabled:cursor-wait disabled:opacity-60 dark:hover:bg-white/[.035] ${dark ? "border-[#3a3944] bg-[#222128]" : "border-[#dfdce6] bg-[#fdfcff]"}`}><GitHubLogo dark={dark} /> {socialPending === "github" ? "Connecting…" : "GitHub"}</button>
       </div>
       <div className="mx-auto mt-3 flex w-full max-w-[330px] items-center gap-3 text-[8px] text-[#777582]"><i className="h-px flex-1 bg-[#e5e2eb] dark:bg-[#34333d]" />or continue with email<i className="h-px flex-1 bg-[#e5e2eb] dark:bg-[#34333d]" /></div>
 

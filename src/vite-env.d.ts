@@ -23,4 +23,14 @@ declare namespace chrome {
     }
     const local: StorageArea;
   }
+  namespace identity {
+    function getRedirectURL(path?: string): string;
+  }
+  namespace runtime {
+    interface MessageSender {
+      url?: string;
+      id?: string;
+    }
+    function sendMessage<T = unknown>(message: unknown): Promise<T>;
+  }
 }

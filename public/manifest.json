@@ -3,8 +3,11 @@
   "name": "Scribe Notes",
   "version": "0.1.0",
   "description": "Quickly capture and organize notes from your browser.",
-  "permissions": ["storage"],
+  "permissions": ["storage", "identity"],
   "host_permissions": ["https://*.supabase.co/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
   "action": {
     "default_title": "Open Scribe Notes",
     "default_popup": "index.html"
