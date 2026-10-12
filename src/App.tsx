@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { User } from "@supabase/supabase-js";
+import type { User, UserIdentity } from "@supabase/supabase-js";
 import { Edit3, Pin, RotateCcw, Trash2, X } from "lucide-react";
 import { AppHeader } from "./components/AppHeader";
 import { NoteEditor } from "./components/NoteEditor";
@@ -32,6 +32,7 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>("auth");
   const [authLoading, setAuthLoading] = useState(Boolean(supabase));
   const [authUser, setAuthUser] = useState<User | null>(null);
+  const [linkedIdentities, setLinkedIdentities] = useState<UserIdentity[]>([]);
   const authUserIdRef = useRef<string | null>(null);
   const [accountLoaded, setAccountLoaded] = useState<string | null>(null);
   const [hasPendingSync, setHasPendingSync] = useState(false);
@@ -126,6 +127,21 @@ export default function App() {
     localStorage.setItem("scribe-profile-name", displayName || "Scribe user");
   }
 
+  async function refreshLinkedIdentities(userId: string): Promise<UserIdentity[] | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.auth.getUserIdentities();
+    if (error) return null;
+    if (authUserIdRef.current !== userId) return null;
+    setLinkedIdentities(data.identities);
+    return data.identities;
+  }
+
+  useEffect(() => {
+    const userId = authUser?.id;
+    if (!userId) return;
+    if (screen === "settings") void refreshLinkedIdentities(userId);
+  }, [authUser?.id, screen]);
+
   useEffect(() => {
     if (!supabase) {
       return;
@@ -134,10 +150,13 @@ export default function App() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
       if (session?.user) {
+        authUserIdRef.current = session.user.id;
         setAuthUser(session.user);
         syncProfile(session.user);
         setScreen("notes");
       } else {
+        authUserIdRef.current = null;
+        setLinkedIdentities([]);
         setAuthUser(null);
         setProfileEmail("");
         setScreen("auth");
@@ -148,10 +167,11 @@ export default function App() {
       if (!mounted) return;
       if (error) setAuthError(error.message);
       if (data.session?.user) {
+        authUserIdRef.current = data.session.user.id;
         setAuthUser(data.session.user);
         syncProfile(data.session.user);
         setScreen("notes");
-      } else { setAuthUser(null); setProfileEmail(""); setScreen("auth"); }
+      } else { authUserIdRef.current = null; setLinkedIdentities([]); setAuthUser(null); setProfileEmail(""); setScreen("auth"); }
       setAuthLoading(false);
     }).catch(() => {
       if (mounted) { setAuthError("Could not restore your session. Please sign in again."); setScreen("auth"); setAuthLoading(false); }
@@ -356,21 +376,26 @@ export default function App() {
     const { error } = await supabase.auth.resend({ type: "signup", email });
     return error?.message ?? null;
   }
+  async function linkProviderIdentityAndRefresh(provider: SocialProvider): Promise<string | null> {
+    const error = await linkProviderIdentity(provider);
+    if (error) return error;
+    const userId = authUserIdRef.current;
+    if (userId) await refreshLinkedIdentities(userId);
+    return null;
+  }
+
   async function unlinkProviderIdentity(provider: SocialProvider): Promise<string | null> {
     if (!supabase) return "Supabase is not configured.";
     const { data, error } = await supabase.auth.getUserIdentities();
     if (error) return error.message;
+    const currentUserId = authUserIdRef.current;
+    if (currentUserId) setLinkedIdentities(data.identities);
     const identity = data.identities.find((item) => item.provider === provider);
     if (!identity) return `No ${provider} identity is linked to this account.`;
     if (data.identities.length <= 1) return "Link another sign-in method before unlinking this one.";
     const { error: unlinkError } = await supabase.auth.unlinkIdentity(identity);
     if (unlinkError) return unlinkError.message;
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError) return userError.message;
-    if (userData.user) {
-      setAuthUser(userData.user);
-      syncProfile(userData.user);
-    }
+    if (currentUserId) await refreshLinkedIdentities(currentUserId);
     return null;
   }
   const orderedFolderKeys = useMemo(() => {
@@ -814,14 +839,14 @@ export default function App() {
             setName={updateProfileName}
             avatar={profileAvatar}
             setAvatar={updateProfileAvatar}
-            linkedAccounts={authUser?.identities
+            linkedAccounts={linkedIdentities
               ?.filter((identity) => identity.provider === "google" || identity.provider === "github")
               .map((identity) => ({
                 provider: identity.provider,
                 email: typeof identity.identity_data?.email === "string" ? identity.identity_data.email : undefined,
               })) ?? []}
-            linkedIdentityCount={authUser?.identities?.length ?? 0}
-            onLinkAccount={linkProviderIdentity}
+            linkedIdentityCount={linkedIdentities.length}
+            onLinkAccount={linkProviderIdentityAndRefresh}
             onUnlinkAccount={unlinkProviderIdentity}
           />
         )}

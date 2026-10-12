@@ -19,8 +19,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ error: "Supabase returned an invalid sign-in URL." });
     return undefined;
   }
-  if (parsedUrl.protocol !== "https:" || parsedUrl.searchParams.get("redirect_to") !== expectedRedirect) {
-    sendResponse({ error: "The sign-in URL does not use this extension’s secure callback." });
+  const provider = message.provider;
+  const flow = message.flow;
+  let projectOrigin;
+  try {
+    const configuredProject = new URL(message.projectOrigin);
+    if (configuredProject.protocol !== "https:") throw new Error("Invalid project URL");
+    projectOrigin = configuredProject.origin;
+  } catch {
+    sendResponse({ error: "Could not start sign-in. Check the Supabase project settings and try again." });
+    return undefined;
+  }
+  const isProviderUrl = parsedUrl.protocol === "https:"
+    && parsedUrl.searchParams.get("redirect_uri") === `${projectOrigin}/auth/v1/callback`
+    && (provider === "google"
+      ? parsedUrl.hostname === "accounts.google.com" && parsedUrl.pathname.startsWith("/o/oauth2/")
+      : provider === "github" && parsedUrl.hostname === "github.com" && parsedUrl.pathname === "/login/oauth/authorize");
+  const isSupabaseSignInUrl = parsedUrl.protocol === "https:"
+    && parsedUrl.origin === projectOrigin
+    && parsedUrl.pathname === "/auth/v1/authorize"
+    && parsedUrl.searchParams.get("provider") === provider
+    && parsedUrl.searchParams.get("redirect_to") === expectedRedirect;
+  if ((flow === "link" && !isProviderUrl) || (flow === "sign-in" && !isSupabaseSignInUrl)) {
+    const providerName = provider === "google" ? "Google" : provider === "github" ? "GitHub" : "provider";
+    sendResponse({ error: `Could not start ${providerName} sign-in. Check the Supabase provider settings and try again.` });
     return undefined;
   }
 

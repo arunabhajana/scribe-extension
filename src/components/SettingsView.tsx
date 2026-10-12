@@ -181,10 +181,15 @@ export function SettingsView({
   }
   async function toggleProvider(provider: "google" | "github", isLinked: boolean) {
     setProviderPending(provider);
-    const error = await (isLinked ? onUnlinkAccount(provider) : onLinkAccount(provider));
-    setProviderPending(null);
     const providerName = provider === "google" ? "Google" : "GitHub";
-    onMessage(error ?? `${providerName} ${isLinked ? "account unlinked" : "account linked"}.`);
+    try {
+      const error = await (isLinked ? onUnlinkAccount(provider) : onLinkAccount(provider));
+      onMessage(error ?? `${providerName} ${isLinked ? "account unlinked" : "account linked"}.`);
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : `${providerName} account could not be updated.`);
+    } finally {
+      setProviderPending(null);
+    }
   }
   function signOutMockDevice(device: MockDevice) {
     setDevices((current) => current.filter((item) => item.id !== device.id));

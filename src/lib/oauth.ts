@@ -9,6 +9,16 @@ type OAuthLaunchResult = {
   error?: string;
 };
 
+function isExpectedProviderUrl(url: URL, provider: SocialProvider, projectOrigin: string): boolean {
+  if (url.protocol !== "https:") return false;
+  const callback = url.searchParams.get("redirect_uri");
+  if (callback !== `${projectOrigin}/auth/v1/callback`) return false;
+  if (provider === "google") {
+    return url.hostname === "accounts.google.com" && url.pathname.startsWith("/o/oauth2/");
+  }
+  return url.hostname === "github.com" && url.pathname === "/login/oauth/authorize";
+}
+
 async function startProviderOAuth(provider: SocialProvider, linkIdentity: boolean): Promise<string | null> {
   if (!supabase) return "Supabase is not configured.";
   if (typeof chrome === "undefined" || !chrome.identity || !chrome.runtime?.sendMessage) {
@@ -30,14 +40,30 @@ async function startProviderOAuth(provider: SocialProvider, linkIdentity: boolea
     if (!data.url) return "Supabase did not return a provider sign-in URL.";
 
     const authorizationUrl = new URL(data.url);
-    const projectUrl = new URL(import.meta.env.VITE_SUPABASE_URL ?? "");
-    if (authorizationUrl.protocol !== "https:" || authorizationUrl.origin !== projectUrl.origin) {
-      return "The sign-in URL does not match the configured Supabase project.";
+    const configuredProjectUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+    if (!configuredProjectUrl) return "Supabase is not configured.";
+    const projectUrl = new URL(configuredProjectUrl);
+    const normalizeHost = (host: string) => host.toLowerCase().replace(/\.$/, "");
+    const isProjectAuthorizeUrl = authorizationUrl.protocol === "https:"
+      && normalizeHost(authorizationUrl.hostname) === normalizeHost(projectUrl.hostname)
+      && (authorizationUrl.port || projectUrl.port) === (projectUrl.port || "")
+      && authorizationUrl.pathname === "/auth/v1/authorize"
+      && authorizationUrl.searchParams.get("provider") === provider
+      && authorizationUrl.searchParams.get("redirect_to") === redirectTo;
+    const validAuthorizationUrl = linkIdentity
+      ? isExpectedProviderUrl(authorizationUrl, provider, projectUrl.origin)
+      : isProjectAuthorizeUrl;
+    if (!validAuthorizationUrl) {
+      const providerName = provider === "google" ? "Google" : "GitHub";
+      return `Could not start ${providerName} sign-in. Check that the provider is enabled in Supabase and try again.`;
     }
 
     const result = await chrome.runtime.sendMessage<OAuthLaunchResult>({
       type: "SCRIBE_LAUNCH_OAUTH",
       authorizationUrl: data.url,
+      provider,
+      flow: linkIdentity ? "link" : "sign-in",
+      projectOrigin: projectUrl.origin,
     });
     if (result.error) return result.error;
     if (!result.callbackUrl) return "The provider did not return a sign-in result.";
