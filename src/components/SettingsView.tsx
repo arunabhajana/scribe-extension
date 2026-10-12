@@ -2,14 +2,15 @@ import { useState } from "react";
 import {
   ArrowLeft,
   Camera,
-  ChevronRight,
+  Database,
+  Globe,
   FolderOpen,
-  LockKeyhole,
   Monitor,
   Moon,
   Palette,
   Search,
   Sun,
+  Smartphone,
   Trash2,
   UserRound,
   X,
@@ -34,7 +35,6 @@ type Props = {
   onAccentChange: (color: string) => void;
   onThemeToggle: () => void;
   onNavigate: (screen: Screen) => void;
-  onOpenApp: () => void;
   onClearNotes: () => void;
   onMessage: (message: string) => void;
   name: string;
@@ -42,7 +42,23 @@ type Props = {
   setName: (name: string) => void;
   avatar: string;
   setAvatar: (avatar: string) => void;
+  linkedAccounts: { provider: string; name?: string; email?: string }[];
 };
+
+type MockDevice = {
+  id: string;
+  name: string;
+  platform: string;
+  activity: string;
+  current?: boolean;
+  kind: "extension" | "desktop" | "mobile";
+};
+
+const initialMockDevices: MockDevice[] = [
+  { id: "this-extension", name: "This extension", platform: "Chrome · This device", activity: "Active now", current: true, kind: "extension" },
+  { id: "windows-app", name: "Windows app", platform: "Scribe for Windows · Windows 11", activity: "Last active recently", kind: "desktop" },
+  { id: "mobile-app", name: "Mobile app", platform: "Scribe Mobile · Android", activity: "Last active yesterday", kind: "mobile" },
+];
 const categories = [
   {
     id: "account",
@@ -64,8 +80,8 @@ const categories = [
   },
   {
     id: "general",
-    label: "General",
-    icon: Monitor,
+    label: "Data",
+    icon: Database,
     color: "#4d9aff",
   },
 ];
@@ -86,7 +102,6 @@ export function SettingsView({
   onAccentChange,
   onThemeToggle,
   onNavigate,
-  onOpenApp,
   onClearNotes,
   onMessage,
   name,
@@ -94,10 +109,15 @@ export function SettingsView({
   setName,
   avatar,
   setAvatar,
+  linkedAccounts,
 }: Props) {
   const [active, setActive] = useState("account");
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [linkedProviders, setLinkedProviders] = useState<Set<string>>(
+    () => new Set(linkedAccounts.filter((item) => ["google", "github"].includes(item.provider)).map((item) => item.provider)),
+  );
+  const [devices, setDevices] = useState(initialMockDevices);
   const current =
     categories.find((category) => category.id === active) ?? categories[0];
   const Icon = current.icon;
@@ -118,38 +138,13 @@ export function SettingsView({
       category: "appearance",
     },
     {
-      label: "Open Scribe App",
-      detail: "Open the full notes experience",
-      category: "general",
-    },
-    {
-      label: "Folders",
-      detail: "Create and browse folders",
-      category: "folders",
-    },
-    {
       label: "Manage folders",
       detail: "Create edit rearrange or delete folders",
       category: "folders",
     },
     {
-      label: "Search notes",
-      detail: "Find a note by its title or content",
-      category: "general",
-    },
-    {
-      label: "Default folder",
-      detail: "Choose where new notes are created",
-      category: "general",
-    },
-    {
-      label: "Pinned notes",
-      detail: "Filter pinned notes",
-      category: "general",
-    },
-    {
       label: "Clear notes",
-      detail: "Remove notes from local preview",
+      detail: "Remove notes from the extension",
       category: "general",
     },
     {
@@ -163,8 +158,8 @@ export function SettingsView({
       category: "account",
     },
     {
-      label: "Password reset",
-      detail: "Reset account password",
+      label: "Linked accounts",
+      detail: "Link or unlink Google and GitHub",
       category: "account",
     },
     {
@@ -179,6 +174,24 @@ export function SettingsView({
     setActive(category);
     setSearch("");
     setSearchOpen(false);
+  }
+  function toggleProvider(provider: "google" | "github") {
+    const wasLinked = linkedProviders.has(provider);
+    setLinkedProviders((current) => {
+      const next = new Set(current);
+      if (wasLinked) next.delete(provider);
+      else next.add(provider);
+      return next;
+    });
+    onMessage(`${provider === "google" ? "Google" : "GitHub"} ${wasLinked ? "unlinked" : "linked"} in this preview. Your Supabase account was not changed.`);
+  }
+  function signOutMockDevice(device: MockDevice) {
+    setDevices((current) => current.filter((item) => item.id !== device.id));
+    onMessage(`${device.name} signed out in this preview.`);
+  }
+  function signOutOtherMockDevices() {
+    setDevices((current) => current.filter((device) => device.current));
+    onMessage("Other sample devices signed out in this preview.");
   }
   return (
     <div className="-mx-[19px] -mb-2 flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -227,48 +240,10 @@ export function SettingsView({
         </div>
         {active === "general" && (
           <>
-            <h1 className="text-[18px] font-bold tracking-[-.45px]">General</h1>
+            <h1 className="text-[18px] font-bold tracking-[-.45px]">Data</h1>
             <p className="mt-1 text-[10px] text-[#6f6d7b]">
-              Quick access and note preferences.
+              Manage your extension notes.
             </p>
-            <SettingsCard
-              title="Quick access"
-              subtitle="Open the full Scribe notes experience."
-              accent={current.color}
-            >
-              <SettingRow
-                title="Open Scribe App"
-                subtitle="Continue in the full notes experience"
-                action="Open"
-                onClick={onOpenApp}
-              />
-            </SettingsCard>
-            <SettingsCard
-              title="Note behavior"
-              subtitle="A few useful controls for your notes."
-              accent={current.color}
-            >
-              <SettingRow
-                title="Default folder"
-                subtitle="New notes use the selected folder, or Work by default"
-                action="Work"
-                onClick={() =>
-                  onMessage(
-                    "New notes use the selected folder, or Work by default.",
-                  )
-                }
-              />
-              <SettingRow
-                title="Pinned notes"
-                subtitle="Pin notes from their cards and use the pin filter"
-                action="Ready"
-                onClick={() =>
-                  onMessage(
-                    "Pinned notes are available from the pin filter on Notes.",
-                  )
-                }
-              />
-            </SettingsCard>
             <button
               className="mt-4 flex w-full items-center justify-between rounded-xl border border-[#f0dfe0] px-3 py-3 text-left transition hover:bg-[#fff8f8] dark:border-[#493337] dark:hover:bg-[#2a2024]"
               onClick={onClearNotes}
@@ -471,32 +446,63 @@ export function SettingsView({
               </div>
             </SettingsCard>
             <SettingsCard
-              title="Password & security"
-              subtitle="Account security controls need sign-in to be connected."
+              title="Linked accounts"
+              subtitle="Preview controls · changes do not update Supabase."
               accent={current.color}
             >
-              <SettingRow
-                title="Password reset"
-                subtitle="Request a reset link for your account"
-                action="Not connected"
-                icon={LockKeyhole}
-                onClick={() =>
-                  onMessage(
-                    "Password reset will be available after account sign-in is connected.",
-                  )
-                }
-              />
-              <SettingRow
-                title="Signed-in devices"
-                subtitle="Review and manage your active sessions"
-                action="Not connected"
-                icon={LockKeyhole}
-                onClick={() =>
-                  onMessage(
-                    "Device management will be available after account sign-in is connected.",
-                  )
-                }
-              />
+              {(["google", "github"] as const).map((provider) => {
+                const isLinked = linkedProviders.has(provider);
+                const providerName = provider === "google" ? "Google" : "GitHub";
+                const identity = linkedAccounts.find((item) => item.provider === provider);
+                return (
+                  <div key={provider} className="flex min-h-[63px] items-center gap-2.5 border-b border-[#e8e5ed] py-2.5 last:border-0 dark:border-[#35343b]">
+                    <span className={`grid size-8 shrink-0 place-items-center rounded-[9px] ${dark ? "bg-[#2a2931]" : "bg-[#f1eff5]"}`}>
+                      <ProviderLogo provider={provider} dark={dark} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <strong className="block text-[10px] font-semibold">{providerName}</strong>
+                      <span className="mt-0.5 block truncate text-[9px] text-[#6f6d7b]">
+                        {isLinked ? (identity?.email ?? "Linked to your account") : "Not linked"}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => toggleProvider(provider)}
+                      className={`h-[29px] shrink-0 rounded-lg border px-2.5 text-[9px] font-semibold transition hover:-translate-y-px ${isLinked ? "border-[#e5c8ca] text-[#bb5963] hover:bg-[#fff2f2] dark:border-[#51353a] dark:hover:bg-[#342327]" : "border-[var(--scribe-accent)]/40 text-[var(--scribe-accent)] hover:bg-[color-mix(in_srgb,var(--scribe-accent)_8%,transparent)]"}`}
+                    >
+                      {isLinked ? "Unlink" : "Link"}
+                    </button>
+                  </div>
+                );
+              })}
+            </SettingsCard>
+            <SettingsCard
+              title="Signed-in devices"
+              subtitle="Sample sessions · controls are preview only."
+              accent={current.color}
+            >
+              <div className="pb-2">
+                {devices.map((device) => (
+                  <div key={device.id} className="flex min-h-[58px] items-center gap-2 border-b border-[#e8e5ed] py-2 dark:border-[#35343b]">
+                    <span className={`grid size-8 shrink-0 place-items-center rounded-[9px] ${dark ? "bg-[#2a2931] text-[#c7c3d0]" : "bg-[#f1eff5] text-[#706d7b]"}`}>
+                      {device.kind === "mobile" ? <Smartphone size={16} /> : device.kind === "desktop" ? <Monitor size={16} /> : <Globe size={16} />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <strong className="truncate text-[10px] font-semibold">{device.name}</strong>
+                        {device.current && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-semibold" style={{ color: current.color, background: `${current.color}18` }}>Current</span>}
+                      </span>
+                      <span className="mt-0.5 block truncate text-[8px] leading-3 text-[#6f6d7b]">{device.platform} · {device.activity}</span>
+                    </span>
+                    {!device.current && <button type="button" onClick={() => signOutMockDevice(device)} className="h-7 min-w-[56px] shrink-0 rounded-lg border border-[#e5c8ca] px-2 text-[8px] font-semibold leading-none text-[#bb5963] transition hover:bg-[#fff2f2] dark:border-[#51353a] dark:hover:bg-[#342327]">Sign out</button>}
+                  </div>
+                ))}
+                {devices.some((device) => !device.current) && (
+                  <button type="button" onClick={signOutOtherMockDevices} className="mt-2 min-h-[32px] w-full rounded-lg border border-[#e5c8ca] px-2.5 text-[9px] font-semibold leading-none text-[#bb5963] transition hover:bg-[#fff2f2] dark:border-[#51353a] dark:hover:bg-[#342327]">
+                    Sign out other devices
+                  </button>
+                )}
+              </div>
             </SettingsCard>
           </>
         )}
@@ -618,35 +624,19 @@ function SettingsCard({
   );
 }
 
-function SettingRow({
-  title,
-  subtitle,
-  action,
-  icon: ActionIcon = ChevronRight,
-  onClick,
-}: {
-  title: string;
-  subtitle: string;
-  action: string;
-  icon?: typeof ChevronRight;
-  onClick?: () => void;
-}) {
+function ProviderLogo({ provider, dark }: { provider: "google" | "github"; dark: boolean }) {
+  if (provider === "google") return (
+    <svg aria-hidden="true" viewBox="0 0 48 48" className="size-[17px]">
+      <path fill="#4285F4" d="M43.6 24.5c0-1.4-.1-2.8-.4-4.1H24v7.8h11a9.4 9.4 0 0 1-4.1 6.2v5h6.7c3.9-3.6 6-8.9 6-14.9Z" />
+      <path fill="#34A853" d="M24 44c5.5 0 10.1-1.8 13.5-4.8l-6.7-5c-1.8 1.2-4.1 1.9-6.8 1.9-5.2 0-9.6-3.5-11.2-8.2H5.9v5.2A20 20 0 0 0 24 44Z" />
+      <path fill="#FBBC05" d="M12.8 27.9a12 12 0 0 1 0-7.7V15H5.9a20 20 0 0 0 0 18.1l6.9-5.2Z" />
+      <path fill="#EA4335" d="M24 12c3 0 5.7 1 7.8 3.1l5.8-5.8A19.3 19.3 0 0 0 24 4 20 20 0 0 0 5.9 15l6.9 5.2C14.4 15.5 18.8 12 24 12Z" />
+    </svg>
+  );
   return (
-    <button
-      className="flex min-h-[58px] w-full items-center gap-2.5 border-b border-[#e8e5ed] py-2.5 text-left transition-colors last:border-0 hover:bg-[#f1eff5] dark:border-[#35343b] dark:hover:bg-[#232229]"
-      onClick={onClick}
-    >
-      <span className="min-w-0 flex-1">
-        <strong className="block text-[11px] font-semibold">{title}</strong>
-        <span className="mt-1 block text-[10px] leading-4 text-[#6f6d7b]">
-          {subtitle}
-        </span>
-      </span>
-      <span className="flex shrink-0 items-center gap-1 rounded-lg border border-[#dedbe5] px-2.5 py-2 text-[9px] font-medium text-[#656370] transition-colors dark:border-[#3a3941]">
-        {action}
-        <ActionIcon size={13} />
-      </span>
-    </button>
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={`size-[17px] ${dark ? "text-white" : "text-[#24292f]"}`} fill="currentColor">
+      <path d="M12 .9a11.1 11.1 0 0 0-3.5 21.6c.6.1.8-.3.8-.6v-2.1c-3.3.7-4-1.4-4-1.4-.5-1.3-1.3-1.6-1.3-1.6-1.1-.8.1-.8.1-.8 1.2.1 1.8 1.2 1.8 1.2 1.1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.8 0-1.3.5-2.4 1.2-3.2-.1-.3-.5-1.5.1-3.2 0 0 1-.3 3.3 1.2a11.4 11.4 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.7.2 2.9.1 3.2.8.8 1.2 1.9 1.2 3.2 0 4.5-2.7 5.5-5.3 5.8.4.3.8 1 .8 2v3.1c0 .3.2.7.8.6A11.1 11.1 0 0 0 12 .9Z" />
+    </svg>
   );
 }
 

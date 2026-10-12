@@ -790,9 +790,6 @@ export default function App() {
             }}
             onThemeToggle={toggleTheme}
             onNavigate={setScreen}
-            onOpenApp={() =>
-              setMessage("The full Scribe app will be available soon.")
-            }
             onClearNotes={clearNotes}
             onMessage={setMessage}
             name={profileName}
@@ -800,6 +797,12 @@ export default function App() {
             setName={updateProfileName}
             avatar={profileAvatar}
             setAvatar={updateProfileAvatar}
+            linkedAccounts={authUser?.identities
+              ?.filter((identity) => identity.provider === "google" || identity.provider === "github")
+              .map((identity) => ({
+                provider: identity.provider,
+                email: typeof identity.identity_data?.email === "string" ? identity.identity_data.email : undefined,
+              })) ?? []}
           />
         )}
         {!authLoading && screen === "auth" && (
