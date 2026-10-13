@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
   ExternalLink,
-  FileText,
   LogOut,
   Moon,
   Settings,
@@ -11,6 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { Tooltip } from "./Tooltip";
+import { AppLogo } from "./AppLogo";
 
 type Props = {
   onHome: () => void;
@@ -93,15 +93,11 @@ export function AppHeader({
   return (
     <header className="relative flex h-[38px] shrink-0 items-center gap-[10px]">
       <button
-        className="grid size-9 place-items-center rounded-xl border-0 text-white shadow-[0_5px_12px_#8c77fa35] transition-all duration-200 hover:-translate-y-px hover:brightness-105"
-        style={{
-          background: `linear-gradient(145deg, color-mix(in srgb, ${accent} 68%, white), ${accent})`,
-          boxShadow: `0 5px 12px ${accent}45`,
-        }}
+        className="grid size-9 shrink-0 place-items-center rounded-lg border-0 bg-transparent p-0 transition-all duration-200 hover:-translate-y-px hover:brightness-105"
         aria-label="Scribe home — click for a surprise"
         onClick={onLogoClick}
       >
-        <FileText size={21} />
+        <AppLogo className="size-9" />
       </button>
       <button
         className="bg-transparent p-0 text-[18px] font-bold tracking-[-.55px]"
@@ -116,18 +112,9 @@ export function AppHeader({
           style={{ borderColor: `${accent}55` }}
         >
           <span
-            className="scribe-mascot relative grid size-11 shrink-0 place-items-center rounded-[13px] text-white"
-            style={{
-              background: `linear-gradient(145deg, color-mix(in srgb, ${accent} 68%, white), ${accent})`,
-              boxShadow: `0 5px 14px ${accent}38`,
-            }}
+            className="scribe-mascot relative grid size-11 shrink-0 place-items-center"
           >
-            <FileText size={25} />
-            <span className="absolute left-[15px] top-[16px] flex gap-[3px]">
-              <i className="size-[2px] rounded-full bg-white" />
-              <i className="size-[2px] rounded-full bg-white" />
-            </span>
-            <span className="absolute left-[17px] top-[20px] h-[3px] w-[5px] rounded-b-full border-b border-white" />
+            <AppLogo variant="tile" className="size-11" />
           </span>
           <span className="min-w-0 flex-1">
             <strong

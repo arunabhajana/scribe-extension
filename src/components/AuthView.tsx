@@ -4,11 +4,10 @@ import {
   Check,
   Eye,
   EyeOff,
-  FileText,
   LockKeyhole,
   Mail,
-  Sparkles,
 } from "lucide-react";
+import { AppLogo } from "./AppLogo";
 
 type Props = {
   dark: boolean;
@@ -92,16 +91,7 @@ export function AuthView({ dark, accent, onAuthenticated, onRegister, onResendVe
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-1 pt-[20px]">
       <div className="mx-auto mt-[14px] flex w-full max-w-[330px] flex-col items-center text-center">
-        <div
-          className="relative grid size-[54px] place-items-center rounded-[17px] text-white shadow-[0_8px_22px_var(--auth-glow)]"
-          style={{
-            background: `linear-gradient(145deg, color-mix(in srgb, ${accent} 68%, white), ${accent})`,
-            "--auth-glow": `${accent}42`,
-          } as React.CSSProperties}
-        >
-          <FileText size={27} strokeWidth={1.8} />
-          <Sparkles className="absolute -right-1.5 -top-1.5 text-[#e6bb72]" size={17} fill="currentColor" />
-        </div>
+        <AppLogo className="size-[54px]" />
         <p className="mb-1 mt-3 text-[9px] font-bold uppercase tracking-[1.55px]" style={{ color: accent }}>
           Your ideas, in sync
         </p>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { User, UserIdentity } from "@supabase/supabase-js";
+import type { Session, User, UserIdentity } from "@supabase/supabase-js";
 import { Edit3, Pin, RotateCcw, Trash2, X } from "lucide-react";
 import { AppHeader } from "./components/AppHeader";
 import { NoteEditor } from "./components/NoteEditor";
@@ -7,6 +7,8 @@ import { NotesView } from "./components/NotesView";
 import { NoteViewer } from "./components/NoteViewer";
 import { SettingsView } from "./components/SettingsView";
 import { AuthView } from "./components/AuthView";
+import { MfaChallengeView } from "./components/mfa/MfaChallengeView";
+import { useMfa } from "./hooks/useMfa";
 import { ContextMenu, type ContextMenuItem } from "./components/ContextMenu";
 import { noteFontFamilies, noteFontFamilyCss, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "./data/noteFontSizes";
 import type { Folder, Note, Screen } from "./types";
@@ -31,7 +33,11 @@ export default function App() {
   );
   const [screen, setScreen] = useState<Screen>("auth");
   const [authLoading, setAuthLoading] = useState(Boolean(supabase));
-  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [authSession, setAuthSession] = useState<Session | null>(null);
+  const observedSessionUserId = useRef<string | null>(null);
+  const mfa = useMfa(authSession);
+  const appReady = !authLoading && !mfa.loading && !mfa.required;
+  const authUser = appReady ? authSession?.user ?? null : null;
   const [linkedIdentities, setLinkedIdentities] = useState<UserIdentity[]>([]);
   const authUserIdRef = useRef<string | null>(null);
   const [accountLoaded, setAccountLoaded] = useState<string | null>(null);
@@ -89,6 +95,16 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<"pending" | "syncing" | "synced" | "error">("synced");
   const [filterPinned, setFilterPinned] = useState(false);
   const [message, setMessage] = useState("");
+  const mfaNotice = mfa.notice;
+  const clearMfaNotice = mfa.clearNotice;
+  useEffect(() => {
+    if (!mfaNotice) return;
+    const timer = window.setTimeout(() => {
+      setMessage(mfaNotice);
+      clearMfaNotice();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [mfaNotice, clearMfaNotice]);
   const selectedNoteFontSize = noteFontSizes.find((option) => option.label === noteFontSize)?.size ?? 13;
   const selected = useMemo(
     () => notes.find((note) => note.id === selectedId),
@@ -127,6 +143,19 @@ export default function App() {
     localStorage.setItem("scribe-profile-name", displayName || "Scribe user");
   }
 
+  async function signOut(): Promise<string | null> {
+    if (!supabase) return "Sign-in is unavailable.";
+    setProfileOpen(false);
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "local" });
+      if (error) return error.message;
+      setAuthSession(null);
+      setScreen("auth");
+      setAuthError("");
+      return null;
+    } catch { return "Could not sign out. Check your connection and try again."; }
+  }
+
   async function refreshLinkedIdentities(userId: string): Promise<UserIdentity[] | null> {
     if (!supabase) return null;
     const { data, error } = await supabase.auth.getUserIdentities();
@@ -149,15 +178,16 @@ export default function App() {
     let mounted = true;
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!mounted) return;
+      const nextUserId = session?.user.id ?? null;
+      const userChanged = observedSessionUserId.current !== nextUserId;
+      observedSessionUserId.current = nextUserId;
+      setAuthSession(session);
       if (session?.user) {
-        authUserIdRef.current = session.user.id;
-        setAuthUser(session.user);
         syncProfile(session.user);
-        setScreen("notes");
+        setScreen((current) => userChanged || current === "auth" || current === "verify-email" ? "notes" : current);
       } else {
         authUserIdRef.current = null;
         setLinkedIdentities([]);
-        setAuthUser(null);
         setProfileEmail("");
         setScreen("auth");
       }
@@ -166,15 +196,15 @@ export default function App() {
     void supabase.auth.getSession().then(({ data, error }) => {
       if (!mounted) return;
       if (error) setAuthError(error.message);
-      if (data.session?.user) {
-        authUserIdRef.current = data.session.user.id;
-        setAuthUser(data.session.user);
+      setAuthSession(error ? null : data.session);
+      observedSessionUserId.current = error ? null : data.session?.user.id ?? null;
+      if (!error && data.session?.user) {
         syncProfile(data.session.user);
-        setScreen("notes");
-      } else { authUserIdRef.current = null; setLinkedIdentities([]); setAuthUser(null); setProfileEmail(""); setScreen("auth"); }
+        setScreen((current) => current === "auth" || current === "verify-email" ? "notes" : current);
+      } else { authUserIdRef.current = null; setLinkedIdentities([]); setProfileEmail(""); setScreen("auth"); }
       setAuthLoading(false);
     }).catch(() => {
-      if (mounted) { setAuthError("Could not restore your session. Please sign in again."); setScreen("auth"); setAuthLoading(false); }
+      if (mounted) { setAuthSession(null); observedSessionUserId.current = null; setAuthError("Could not restore your session. Please sign in again."); setScreen("auth"); setAuthLoading(false); }
     });
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
@@ -683,7 +713,7 @@ export default function App() {
           if (!target.closest("input, textarea, select, [contenteditable='true']")) event.preventDefault();
         }}
       >
-        {!authLoading && screen !== "auth" && screen !== "verify-email" && <AppHeader
+        {appReady && screen !== "auth" && screen !== "verify-email" && <AppHeader
           onHome={() => {
             setProfileOpen(false);
             setScreen("notes");
@@ -697,20 +727,17 @@ export default function App() {
           dark={dark}
           onThemeToggle={toggleTheme}
           onSignOut={() => {
-            setProfileOpen(false);
-            void supabase?.auth.signOut().then(({ error }) => {
-              if (error) setAuthError(error.message);
-              setScreen("auth");
-            });
+            void signOut().then((error) => { if (error) setMessage(error); });
           }}
           name={profileName}
           email={profileEmail}
           avatar={profileAvatar}
           accent={accent}
         />}
-        {authLoading && <div className="flex min-h-0 flex-1 items-center justify-center text-[11px] text-[#92909e]">Checking your session…</div>}
-        {!authLoading && screen === "notes" && accountLoaded !== authUser?.id && <div className="flex min-h-0 flex-1 items-center justify-center text-[11px] text-[#92909e]">Opening your local notes…</div>}
-        {!authLoading && screen === "notes" && accountLoaded === authUser?.id && (
+        {(authLoading || mfa.loading) && <div className="flex min-h-0 flex-1 items-center justify-center text-[11px] text-[#92909e]">Checking your session…</div>}
+        {!authLoading && !mfa.loading && mfa.required && <MfaChallengeView mfa={mfa} onSignOut={signOut} />}
+        {appReady && screen === "notes" && accountLoaded !== authUser?.id && <div className="flex min-h-0 flex-1 items-center justify-center text-[11px] text-[#92909e]">Opening your local notes…</div>}
+        {appReady && screen === "notes" && accountLoaded === authUser?.id && (
           <NotesView
             notes={notes}
             folders={folders}
@@ -761,7 +788,7 @@ export default function App() {
             }}
           />
         )}
-        {!authLoading && screen === "view" && (
+        {appReady && screen === "view" && (
           <ContextMenu
             accent={accent}
             dark={dark}
@@ -796,7 +823,7 @@ export default function App() {
           />
           </ContextMenu>
         )}
-        {!authLoading && screen === "editor" && (
+        {appReady && screen === "editor" && (
           <NoteEditor
             note={selected}
             folders={folders}
@@ -814,8 +841,9 @@ export default function App() {
             onTogglePin={() => selected && togglePin(selected.id)}
           />
         )}
-        {!authLoading && screen === "settings" && (
+        {appReady && screen === "settings" && (
           <SettingsView
+            mfa={mfa}
             dark={dark}
             accent={accent}
             folders={folders}
@@ -858,14 +886,13 @@ export default function App() {
             onUnlinkAccount={unlinkProviderIdentity}
           />
         )}
-        {!authLoading && screen === "auth" && (
+        {appReady && screen === "auth" && (
           <AuthView
             dark={dark}
             accent={accent}
             onAuthenticated={(_accountName, accountEmail) => {
               if (accountEmail) localStorage.setItem("scribe-profile-email", accountEmail);
               setScreen("notes");
-              setMessage("You’re signed in. Your notes are ready.");
             }}
             onSignIn={signIn}
             onSignInWithProvider={startProviderSignIn}
@@ -877,7 +904,7 @@ export default function App() {
             onMessage={setMessage}
           />
         )}
-        {authError && screen === "auth" && !authLoading && <div role="alert" className="absolute bottom-[65px] left-5 right-5 rounded-xl border border-[#f2cbd0] bg-[#fff5f6] px-3 py-2 text-[9px] text-[#a84455] dark:border-[#57333a] dark:bg-[#321f24] dark:text-[#f3aab4]">{authError}</div>}
+        {authError && screen === "auth" && appReady && <div role="alert" className="absolute bottom-[65px] left-5 right-5 rounded-xl border border-[#f2cbd0] bg-[#fff5f6] px-3 py-2 text-[9px] text-[#a84455] dark:border-[#57333a] dark:bg-[#321f24] dark:text-[#f3aab4]">{authError}</div>}
         {message && (
           <div
             role="status"

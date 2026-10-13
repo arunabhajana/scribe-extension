@@ -73,12 +73,20 @@ export async function syncAccount(user: User, cache: AccountCache): Promise<Acco
   if (!supabase) throw new Error("Supabase is not configured.");
   const { data: { session }, error: sessionError } = await supabase.auth.getSession();
   if (sessionError || session?.user.id !== user.id) throw new Error("The signed-in account changed. Local changes are queued for that account.");
-  const operations = (cache.inFlight?.operations ?? [...cache.outbox].sort((a, b) => (a.entity === "folder" && a.kind === "upsert" ? 0 : a.entity === "folder" ? 2 : 1) - (b.entity === "folder" && b.kind === "upsert" ? 0 : b.entity === "folder" ? 2 : 1) || a.sequence - b.sequence).slice(0, 50));
+  const rank = (op: Operation) => op.entity === "note" && op.kind === "delete" ? -1 : op.entity === "folder" && op.kind === "upsert" ? 0 : op.entity === "folder" ? 2 : 1;
+  const operations = (cache.inFlight?.operations ?? [...cache.outbox].sort((a, b) => rank(a) - rank(b) || a.sequence - b.sequence).slice(0, 50));
   const batch = cache.inFlight ?? { id: crypto.randomUUID(), operations, payload: operations.map((op) => encode(op, cache)) };
   cache.inFlight = batch;
   await save(cache);
   const { data, error } = await supabase.rpc("sync_notes_batch", { p_batch_id: batch.id, p_operations: batch.payload, p_cursor: cache.cursor }).setHeader("Authorization", `Bearer ${session.access_token}`).abortSignal(AbortSignal.timeout(20_000));
   if (error) {
+    if (error.message.includes("SCRIBE_STORAGE_LIMIT_REACHED")) {
+      // The server rolled this transaction back; prepare a fresh batch so
+      // deletions or smaller local edits can resolve the storage limit.
+      cache.inFlight = undefined;
+      await save(cache);
+      throw new Error("Cloud storage limit reached (10 MB). Permanently delete unwanted notes or shorten their content to free space.");
+    }
     if (/function .*sync_notes_batch.* does not exist|schema cache/i.test(error.message)) throw new Error(`${error.message} Apply the Scribe batch-sync migration to this Supabase project.`);
     throw new Error(error.message);
   }

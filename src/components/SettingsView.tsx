@@ -16,9 +16,12 @@ import {
 } from "lucide-react";
 import type { Folder, Screen } from "../types";
 import { FolderSettings } from "./FolderSettings";
+import { MfaSettings } from "./mfa/MfaSettings";
+import type { MfaController } from "../hooks/useMfa";
 import { noteFontFamilies, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "../data/noteFontSizes";
 
 type Props = {
+  mfa: MfaController;
   dark: boolean;
   accent: string;
   folders: Folder[];
@@ -115,6 +118,7 @@ export function SettingsView({
   linkedIdentityCount,
   onLinkAccount,
   onUnlinkAccount,
+  mfa,
 }: Props) {
   const [active, setActive] = useState("account");
   const [search, setSearch] = useState("");
@@ -186,6 +190,7 @@ export function SettingsView({
       detail: "Link or unlink Google and GitHub",
       category: "account",
     },
+    { label: "Two-step verification", detail: "Set up or remove Authy and two-factor authentication (2FA / MFA)", category: "account" },
     {
       label: "Signed-in devices",
       detail: "Manage account sessions",
@@ -480,6 +485,9 @@ export function SettingsView({
                   ))}
                 </div>
               </div>
+            </SettingsCard>
+            <SettingsCard title="Two-step verification" subtitle="Add an authenticator for extra sign-in protection." accent={current.color}>
+              <MfaSettings mfa={mfa} />
             </SettingsCard>
             <SettingsCard
               title="Linked accounts"
