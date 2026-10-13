@@ -33,47 +33,59 @@ export function FolderManager({
   onCreate,
   dark,
   accent,
+  editingFolder,
+  onUpdate,
+  onClose,
 }: {
   folders: FolderType[];
   onCreate: (folder: FolderType) => void;
   dark: boolean;
   accent: string;
+  editingFolder?: FolderType;
+  onUpdate?: (id: string, folder: FolderType) => void;
+  onClose?: () => void;
 }) {
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [icon, setIcon] = useState("folder");
-  const [color, setColor] = useState(folderColors[0].value);
+  const [dialogOpen, setDialogOpen] = useState(Boolean(editingFolder));
+  const [name, setName] = useState(editingFolder?.name ?? "");
+  const [icon, setIcon] = useState(editingFolder?.icon ?? "folder");
+  const [color, setColor] = useState(editingFolder?.color ?? folderColors[0].value);
+  const duplicateName = folders.some((folder) => folder.id !== editingFolder?.id && folder.name.toLowerCase() === name.trim().toLowerCase());
+  function close() {
+    setDialogOpen(false);
+    onClose?.();
+  }
   function submit() {
     const cleanName = name.trim();
     if (
       !cleanName ||
-      folders.some(
-        (folder) => folder.name.toLowerCase() === cleanName.toLowerCase(),
-      )
+      duplicateName
     )
       return;
-    onCreate({
+    if (editingFolder) {
+      if (!onUpdate) return;
+      onUpdate(editingFolder.id, { ...editingFolder, name: cleanName, icon, color });
+    } else onCreate({
       id: crypto.randomUUID(),
       name: cleanName,
       icon,
       color,
     });
     setName("");
-    setDialogOpen(false);
+    close();
   }
   return (
     <>
-      <button
+      {!editingFolder && <button
         id="folder-create-trigger"
         className="hidden"
         aria-label="Open create folder dialog"
         onClick={() => setDialogOpen(true)}
-      />
+      />}
       {dialogOpen && (
         <div
           className={`absolute inset-0 z-30 grid place-items-center p-4 ${dark ? "bg-black/65" : "bg-[#1b1930]/30"}`}
           onMouseDown={(event) =>
-            event.target === event.currentTarget && setDialogOpen(false)
+            event.target === event.currentTarget && close()
           }
         >
           <div
@@ -81,7 +93,7 @@ export function FolderManager({
           >
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-sm font-semibold">Create a folder</h2>
+                <h2 className="text-sm font-semibold">{editingFolder ? "Edit folder" : "Create a folder"}</h2>
                 <p
                   className={`mt-1 text-[10px] ${dark ? "text-[#a5a3ae]" : "text-[#777684]"}`}
                 >
@@ -91,7 +103,7 @@ export function FolderManager({
               <button
                 aria-label="Close dialog"
                 className={`rounded-md p-1 ${dark ? "text-[#aaa8b3] hover:bg-white/10" : "text-[#858491] hover:bg-black/5"}`}
-                onClick={() => setDialogOpen(false)}
+                onClick={close}
               >
                 <X size={16} />
               </button>
@@ -177,23 +189,20 @@ export function FolderManager({
             <div className="mt-5 flex justify-end gap-2">
               <button
                 className={`rounded-lg border px-3 py-2 text-[10px] ${dark ? "border-[#3b3944] text-[#bbb9c4] hover:bg-white/5" : "border-[#e5e3eb] text-[#777684] hover:bg-black/5"}`}
-                onClick={() => setDialogOpen(false)}
+                onClick={close}
               >
                 Cancel
               </button>
               <button
                 disabled={
                   !name.trim() ||
-                  folders.some(
-                    (folder) =>
-                      folder.name.toLowerCase() === name.trim().toLowerCase(),
-                  )
+                  duplicateName
                 }
                 style={{ backgroundColor: accent }}
                 className="rounded-lg px-3 py-2 text-[10px] font-semibold text-white transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45"
                 onClick={submit}
               >
-                Create folder
+                {editingFolder ? "Save changes" : "Create folder"}
               </button>
             </div>
           </div>

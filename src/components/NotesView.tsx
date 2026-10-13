@@ -33,6 +33,7 @@ type Props = {
   folders: Folder[];
   folderOrder: string[];
   onCreateFolder: (folder: Folder) => void;
+  onUpdateFolder: (id: string, folder: Folder) => void;
   dark: boolean;
   accent: string;
   syncStatus: "pending" | "syncing" | "synced" | "error";
@@ -57,6 +58,8 @@ type Props = {
 };
 
 export function NotesView(props: Props) {
+  const [editingFolderId, setEditingFolderId] = useState<string | null>(null);
+  const editingFolder = props.folders.find((folder) => folder.id === editingFolderId);
   const { preferences: sortPreferences, setPreference: setSortPreference } = useNoteSortPreferences();
   const activeFolderId = props.folders.find((folder) => folder.name === props.activeFolder)?.id;
   const sortKey = `${props.accountId}:${activeFolderId ? `folder:${activeFolderId}` : props.activeFolder}:${props.filterPinned ? "pinned" : "all"}`;
@@ -200,6 +203,7 @@ export function NotesView(props: Props) {
                     if (props.filterPinned) props.onFilterPinned();
                   } },
                   { label: "New note in folder", icon: Plus, onSelect: () => props.onCreateNoteInFolder(folder.name) },
+                  { label: "Edit folder", icon: Edit3, onSelect: () => setEditingFolderId(folder.id) },
                 ]}>
                   <button
                     className={`flex h-[32px] shrink-0 items-center gap-1.5 rounded-[9px] px-2.5 text-[11px] transition hover:-translate-y-px ${props.activeFolder === folder.name ? "font-semibold" : "text-[#747586] hover:bg-[#f7f5ff] dark:text-[#a8a6b7] dark:hover:bg-[#292830]"}`}
@@ -260,6 +264,16 @@ export function NotesView(props: Props) {
             dark={props.dark}
             accent={props.accent}
           />
+          {editingFolder && <FolderManager
+            key={editingFolder.id}
+            folders={props.folders}
+            editingFolder={editingFolder}
+            onCreate={props.onCreateFolder}
+            onUpdate={props.onUpdateFolder}
+            onClose={() => setEditingFolderId(null)}
+            dark={props.dark}
+            accent={props.accent}
+          />}
         </div>
         {canGoBack && (
           <button

@@ -779,6 +779,7 @@ export default function App() {
             folders={folders}
             folderOrder={orderedFolderKeys}
             onCreateFolder={createFolder}
+            onUpdateFolder={updateFolder}
             dark={dark}
             accent={accent}
             syncStatus={syncStatus}
