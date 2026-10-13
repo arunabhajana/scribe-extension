@@ -9,6 +9,7 @@ import { SettingsView } from "./components/SettingsView";
 import { AuthView } from "./components/AuthView";
 import { MfaChallengeView } from "./components/mfa/MfaChallengeView";
 import { useMfa } from "./hooks/useMfa";
+import { useDeviceSessions } from "./hooks/useDeviceSessions";
 import { ContextMenu, type ContextMenuItem } from "./components/ContextMenu";
 import { noteFontFamilies, noteFontFamilyCss, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "./data/noteFontSizes";
 import type { Folder, Note, Screen } from "./types";
@@ -37,6 +38,7 @@ export default function App() {
   const observedSessionUserId = useRef<string | null>(null);
   const mfa = useMfa(authSession);
   const appReady = !authLoading && !mfa.loading && !mfa.required;
+  const deviceInventory = useDeviceSessions(authSession, appReady);
   const authUser = appReady ? authSession?.user ?? null : null;
   const [linkedIdentities, setLinkedIdentities] = useState<UserIdentity[]>([]);
   const authUserIdRef = useRef<string | null>(null);
@@ -844,6 +846,7 @@ export default function App() {
         {appReady && screen === "settings" && (
           <SettingsView
             mfa={mfa}
+            deviceInventory={deviceInventory}
             dark={dark}
             accent={accent}
             folders={folders}

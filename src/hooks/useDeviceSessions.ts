@@ -1,0 +1,94 @@
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { Session } from "@supabase/supabase-js";
+import { deviceSessionError, getSignedInDevices, recentDeviceCheckIn, registerDeviceSession, rememberDeviceCheckIn, type SignedInDevice } from "../lib/deviceSessions";
+
+function inventoryKey(session: Session | null, enabled: boolean) {
+  if (!session || !enabled) return "";
+  try {
+    const payload = session.access_token.split(".")[1];
+    const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof claims.session_id === "string" ? `${session.user.id}:${claims.session_id}` : "";
+  } catch { return ""; }
+}
+
+export function useDeviceSessions(session: Session | null, enabled: boolean) {
+  const key = inventoryKey(session, enabled);
+  const keyRef = useRef(key);
+  const registration = useRef({ key: "", at: 0 });
+  const registering = useRef<{ key: string; task: Promise<void> } | null>(null);
+  const pending = useRef<{ key: string; task: Promise<void> } | null>(null);
+  const [state, setState] = useState<{ key: string; devices: SignedInDevice[]; loading: boolean; error: string; checkedAt: number | null }>({ key: "", devices: [], loading: false, error: "", checkedAt: null });
+  useLayoutEffect(() => { keyRef.current = key; }, [key]);
+
+  const checkIn = useCallback(async (expectedKey: string) => {
+    if (!expectedKey || keyRef.current !== expectedKey) return;
+    if (registration.current.key === expectedKey && Date.now() - registration.current.at < 10 * 60_000) return;
+    if (registering.current?.key === expectedKey) return registering.current.task;
+    const task = (async () => {
+      try {
+        const recentCheckIn = await recentDeviceCheckIn(expectedKey);
+        if (recentCheckIn !== null) {
+          if (keyRef.current === expectedKey) registration.current = { key: expectedKey, at: recentCheckIn };
+          return;
+        }
+        if (keyRef.current !== expectedKey) return;
+        await registerDeviceSession();
+        if (keyRef.current === expectedKey) {
+          const at = Date.now();
+          registration.current = { key: expectedKey, at };
+          await rememberDeviceCheckIn(expectedKey, at);
+        }
+      } finally { if (registering.current?.key === expectedKey) registering.current = null; }
+    })();
+    registering.current = { key: expectedKey, task };
+    return task;
+  }, []);
+
+  const refresh = useCallback((): Promise<void> => {
+    const expectedKey = keyRef.current;
+    if (!expectedKey) return Promise.resolve();
+    if (pending.current?.key === expectedKey) return pending.current.task;
+    setState((previous) => ({ key: expectedKey, devices: previous.key === expectedKey ? previous.devices : [], loading: true, error: "", checkedAt: previous.key === expectedKey ? previous.checkedAt : null }));
+    const task = (async () => {
+      try {
+        await checkIn(expectedKey);
+        if (keyRef.current !== expectedKey) return;
+        const devices = await getSignedInDevices();
+        if (keyRef.current === expectedKey) setState({ key: expectedKey, devices, loading: false, error: "", checkedAt: Date.now() });
+      } catch (error) {
+        if (keyRef.current === expectedKey) setState((previous) => ({ ...previous, loading: false, error: deviceSessionError(error) }));
+      } finally {
+        if (pending.current?.key === expectedKey) pending.current = null;
+      }
+    })();
+    pending.current = { key: expectedKey, task };
+    return task;
+  }, [checkIn]);
+
+  useEffect(() => {
+    if (!key) return;
+    // Opening a popup registers this session, but only Account settings reads the inventory.
+    const timer = window.setTimeout(() => void checkIn(key).catch(() => {}), 0);
+    const heartbeat = () => {
+      if (document.visibilityState !== "visible" || !navigator.onLine) return;
+      void checkIn(key).catch(() => { /* The inventory refresh presents errors on demand. */ });
+    };
+    const interval = window.setInterval(heartbeat, 10 * 60_000);
+    window.addEventListener("focus", heartbeat);
+    window.addEventListener("online", heartbeat);
+    return () => {
+      window.clearTimeout(timer); window.clearInterval(interval);
+      window.removeEventListener("focus", heartbeat); window.removeEventListener("online", heartbeat);
+    };
+  }, [key, checkIn]);
+
+  return {
+    devices: key && state.key === key ? state.devices : [],
+    loading: Boolean(key && (state.key !== key || state.loading)),
+    error: key && state.key === key ? state.error : "",
+    checkedAt: key && state.key === key ? state.checkedAt : null,
+    refresh,
+  };
+}
+
+export type DeviceInventory = ReturnType<typeof useDeviceSessions>;

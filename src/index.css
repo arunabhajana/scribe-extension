@@ -36,6 +36,11 @@ button {
   font-weight: 600;
   line-height: 1.4;
 }
+.extension-device-button {
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.4;
+}
 .extension-totp-code {
   font-size: 17px;
   font-weight: 700;

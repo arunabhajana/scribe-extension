@@ -2,14 +2,11 @@ import { useState } from "react";
 import {
   ArrowLeft,
   Database,
-  Globe,
   FolderOpen,
-  Monitor,
   Moon,
   Palette,
   Search,
   Sun,
-  Smartphone,
   Trash2,
   UserRound,
   X,
@@ -18,9 +15,12 @@ import type { Folder, Screen } from "../types";
 import { FolderSettings } from "./FolderSettings";
 import { MfaSettings } from "./mfa/MfaSettings";
 import type { MfaController } from "../hooks/useMfa";
+import type { DeviceInventory } from "../hooks/useDeviceSessions";
+import { SignedInDevices } from "./SignedInDevices";
 import { noteFontFamilies, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "../data/noteFontSizes";
 
 type Props = {
+  deviceInventory: DeviceInventory;
   mfa: MfaController;
   dark: boolean;
   accent: string;
@@ -50,20 +50,6 @@ type Props = {
   onUnlinkAccount: (provider: "google" | "github") => Promise<string | null>;
 };
 
-type MockDevice = {
-  id: string;
-  name: string;
-  platform: string;
-  activity: string;
-  current?: boolean;
-  kind: "extension" | "desktop" | "mobile";
-};
-
-const initialMockDevices: MockDevice[] = [
-  { id: "this-extension", name: "This extension", platform: "Chrome · This device", activity: "Active now", current: true, kind: "extension" },
-  { id: "windows-app", name: "Windows app", platform: "Scribe for Windows · Windows 11", activity: "Last active recently", kind: "desktop" },
-  { id: "mobile-app", name: "Mobile app", platform: "Scribe Mobile · Android", activity: "Last active yesterday", kind: "mobile" },
-];
 const categories = [
   {
     id: "account",
@@ -119,6 +105,7 @@ export function SettingsView({
   onLinkAccount,
   onUnlinkAccount,
   mfa,
+  deviceInventory,
 }: Props) {
   const [active, setActive] = useState("account");
   const [search, setSearch] = useState("");
@@ -126,7 +113,6 @@ export function SettingsView({
   const [providerPending, setProviderPending] = useState<"google" | "github" | null>(null);
   const [nameDraft, setNameDraft] = useState(name);
   const [savingName, setSavingName] = useState(false);
-  const [devices, setDevices] = useState(initialMockDevices);
   const current =
     categories.find((category) => category.id === active) ?? categories[0];
   const Icon = current.icon;
@@ -193,7 +179,7 @@ export function SettingsView({
     { label: "Two-step verification", detail: "Set up or remove Authy and two-factor authentication (2FA / MFA)", category: "account" },
     {
       label: "Signed-in devices",
-      detail: "Manage account sessions",
+      detail: "View real account sessions and last-seen activity",
       category: "account",
     },
   ].filter((item) =>
@@ -215,14 +201,6 @@ export function SettingsView({
     } finally {
       setProviderPending(null);
     }
-  }
-  function signOutMockDevice(device: MockDevice) {
-    setDevices((current) => current.filter((item) => item.id !== device.id));
-    onMessage(`${device.name} signed out in this preview.`);
-  }
-  function signOutOtherMockDevices() {
-    setDevices((current) => current.filter((device) => device.current));
-    onMessage("Other sample devices signed out in this preview.");
   }
   return (
     <div className="-mx-[19px] -mb-2 flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -523,33 +501,8 @@ export function SettingsView({
                 );
               })}
             </SettingsCard>
-            <SettingsCard
-              title="Signed-in devices"
-              subtitle="Sample sessions · controls are preview only."
-              accent={current.color}
-            >
-              <div className="pb-2">
-                {devices.map((device) => (
-                  <div key={device.id} className="flex min-h-[58px] items-center gap-2 border-b border-[#e8e5ed] py-2 dark:border-[#35343b]">
-                    <span className={`grid size-8 shrink-0 place-items-center rounded-[9px] ${dark ? "bg-[#2a2931] text-[#c7c3d0]" : "bg-[#f1eff5] text-[#706d7b]"}`}>
-                      {device.kind === "mobile" ? <Smartphone size={16} /> : device.kind === "desktop" ? <Monitor size={16} /> : <Globe size={16} />}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <strong className="truncate text-[10px] font-semibold">{device.name}</strong>
-                        {device.current && <span className="shrink-0 rounded-full px-1.5 py-0.5 text-[7px] font-semibold" style={{ color: current.color, background: `${current.color}18` }}>Current</span>}
-                      </span>
-                      <span className="mt-0.5 block truncate text-[8px] leading-3 text-[#6f6d7b]">{device.platform} · {device.activity}</span>
-                    </span>
-                    {!device.current && <button type="button" onClick={() => signOutMockDevice(device)} className="h-7 min-w-[56px] shrink-0 rounded-lg border border-[#e5c8ca] px-2 text-[8px] font-semibold leading-none text-[#bb5963] transition hover:bg-[#fff2f2] dark:border-[#51353a] dark:hover:bg-[#342327]">Sign out</button>}
-                  </div>
-                ))}
-                {devices.some((device) => !device.current) && (
-                  <button type="button" onClick={signOutOtherMockDevices} className="mt-2 min-h-[32px] w-full rounded-lg border border-[#e5c8ca] px-2.5 text-[9px] font-semibold leading-none text-[#bb5963] transition hover:bg-[#fff2f2] dark:border-[#51353a] dark:hover:bg-[#342327]">
-                    Sign out other devices
-                  </button>
-                )}
-              </div>
+            <SettingsCard title="Signed-in devices" subtitle="Sign-in sessions associated with your account." accent={current.color}>
+              <SignedInDevices inventory={deviceInventory} dark={dark} accent={current.color} />
             </SettingsCard>
           </>
         )}
