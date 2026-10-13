@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
@@ -15,6 +15,7 @@ import {
 import type { Folder as FolderType, Note } from "../types";
 import { Tooltip } from "./Tooltip";
 import { FolderGlyph } from "./FolderGlyph";
+import { continueList, setListOnCurrentLine, type ListEdit } from "../data/listEditing";
 
 type Props = {
   note: Note | undefined;
@@ -50,10 +51,24 @@ export function NoteEditor({
   onTogglePin,
 }: Props) {
   const bodyRef = useRef<HTMLTextAreaElement>(null);
+  const pendingSelection = useRef<{ noteId?: string; start: number; end: number; scrollTop: number } | null>(null);
   const titleRef = useRef<HTMLInputElement>(null);
   const folderMenuRef = useRef<HTMLDivElement>(null);
   const [folderOpen, setFolderOpen] = useState(false);
   const noteFolder = folders.find((folder) => folder.name === note?.folder);
+  useLayoutEffect(() => {
+    const selection = pendingSelection.current;
+    pendingSelection.current = null;
+    if (selection && selection.noteId === note?.id && bodyRef.current) {
+      bodyRef.current.focus();
+      bodyRef.current.setSelectionRange(selection.start, selection.end);
+      bodyRef.current.scrollTop = selection.scrollTop;
+    }
+  }, [note?.body, note?.id]);
+  function applyListEdit(edit: ListEdit) {
+    pendingSelection.current = { noteId: note?.id, start: edit.selectionStart, end: edit.selectionEnd, scrollTop: bodyRef.current?.scrollTop ?? 0 };
+    onUpdate("body", edit.value);
+  }
   useEffect(() => {
     if (focusField === "title") titleRef.current?.focus();
     else bodyRef.current?.focus();
@@ -246,12 +261,19 @@ export function NoteEditor({
               <button
                 aria-label={toolLabel}
                 className="grid size-[31px] place-items-center rounded-md text-[#484856] transition-colors hover:bg-[color-mix(in_srgb,var(--editor-accent)_12%,transparent)] hover:text-[var(--editor-accent)] dark:text-[#dddbe7]"
-                onClick={() =>
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => {
+                  if (toolLabel === "Bulleted list" || toolLabel === "Numbered list") {
+                    const body = bodyRef.current;
+                    const value = body?.value ?? note?.body ?? "";
+                    applyListEdit(setListOnCurrentLine(value, body?.selectionStart ?? value.length, body?.selectionEnd ?? value.length, toolLabel === "Numbered list"));
+                    return;
+                  }
                   onUpdate(
                     "body",
-                    `${note?.body ?? ""}${toolLabel === "Bulleted list" ? "\n• " : toolLabel === "Numbered list" ? "\n1. " : toolLabel === "Add link" ? " [link](https://)" : toolLabel === "Add image" ? "\n[Image]" : toolLabel === "Bold" ? " **bold text**" : " *italic text*"}`,
-                  )
-                }
+                    `${note?.body ?? ""}${toolLabel === "Add link" ? " [link](https://)" : toolLabel === "Add image" ? "\n[Image]" : toolLabel === "Bold" ? " **bold text**" : " *italic text*"}`,
+                  );
+                }}
               >
                 <ToolIcon size={17} />
               </button>
@@ -266,6 +288,14 @@ export function NoteEditor({
         aria-label="Note content"
         value={note?.body ?? ""}
         onChange={(event) => onUpdate("body", event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter" || event.shiftKey || event.ctrlKey || event.altKey || event.metaKey || event.nativeEvent.isComposing) return;
+          const body = event.currentTarget;
+          const edit = continueList(body.value, body.selectionStart, body.selectionEnd);
+          if (!edit) return;
+          event.preventDefault();
+          applyListEdit(edit);
+        }}
         placeholder="Start writing…"
       />
       <div className="flex shrink-0 items-center justify-between gap-2 pt-3">
