@@ -23,8 +23,12 @@ import { FolderGlyph } from "./FolderGlyph";
 import { FolderManager } from "./FolderManager";
 import { Tooltip } from "./Tooltip";
 import { ContextMenu, type ContextMenuItem } from "./ContextMenu";
+import { defaultNoteSort, sortNotes } from "../data/noteSorting";
+import { useNoteSortPreferences } from "../hooks/useNoteSortPreferences";
+import { NoteSortDropdown } from "./NoteSortDropdown";
 
 type Props = {
+  accountId: string;
   notes: Note[];
   folders: Folder[];
   folderOrder: string[];
@@ -53,6 +57,10 @@ type Props = {
 };
 
 export function NotesView(props: Props) {
+  const { preferences: sortPreferences, setPreference: setSortPreference } = useNoteSortPreferences();
+  const activeFolderId = props.folders.find((folder) => folder.name === props.activeFolder)?.id;
+  const sortKey = `${props.accountId}:${activeFolderId ? `folder:${activeFolderId}` : props.activeFolder}:${props.filterPinned ? "pinned" : "all"}`;
+  const sortOrder = sortPreferences[sortKey] ?? defaultNoteSort;
   const folderScrollRef = useRef<HTMLDivElement>(null);
   const [hasMoreFolders, setHasMoreFolders] = useState(false);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -76,7 +84,7 @@ export function NotesView(props: Props) {
   }, [updateFolderOverflow, props.folders.length]);
   const visibleNotes = useMemo(
     () =>
-      props.notes
+      sortNotes(props.notes
         .filter((note) => {
           const sectionMatches =
             props.activeFolder === "Trash"
@@ -95,9 +103,8 @@ export function NotesView(props: Props) {
               .toLowerCase()
               .includes(props.query.toLowerCase())
           );
-        })
-        .sort((a, b) => Number(Boolean(b.pinned)) - Number(Boolean(a.pinned))),
-    [props.notes, props.activeFolder, props.filterPinned, props.query],
+        }), sortOrder),
+    [props.notes, props.activeFolder, props.filterPinned, props.query, sortOrder],
   );
   return (
     <>
@@ -336,6 +343,10 @@ export function NotesView(props: Props) {
             />
           </button>
         </Tooltip>
+      </div>
+      <div className="flex shrink-0 items-center justify-between gap-2 pb-1 pt-2">
+        <span className="min-w-0 truncate text-[9px] font-medium text-[#747586] dark:text-[#a8a6b7]">{props.filterPinned ? "Pinned notes" : props.activeFolder}</span>
+        <NoteSortDropdown value={sortOrder} onChange={(value) => setSortPreference(sortKey, value)} />
       </div>
       <section
         className="notes-scroll flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pl-px pr-2 pt-2 pb-[9px]"

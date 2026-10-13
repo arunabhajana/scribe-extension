@@ -774,6 +774,7 @@ export default function App() {
         {appReady && screen === "notes" && accountLoaded !== authUser?.id && <div className="flex min-h-0 flex-1 items-center justify-center text-[11px] text-[#92909e]">Opening your local notes…</div>}
         {appReady && screen === "notes" && accountLoaded === authUser?.id && (
           <NotesView
+            accountId={authUser?.id ?? ""}
             notes={notes}
             folders={folders}
             folderOrder={orderedFolderKeys}
