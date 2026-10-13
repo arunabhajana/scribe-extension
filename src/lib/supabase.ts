@@ -1,6 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
+import { sessionAwareFetch } from "./sessionEvents";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim();
+export const authStorageKey = supabaseUrl ? `sb-${new URL(supabaseUrl).hostname.split(".")[0]}-auth-token` : "";
 const supabaseKey = (
   import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
   import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -9,6 +11,7 @@ const supabaseKey = (
 export const supabaseConfigured = Boolean(supabaseUrl && supabaseKey);
 export const supabase = supabaseConfigured
   ? createClient(supabaseUrl!, supabaseKey!, {
+      global: { fetch: sessionAwareFetch },
       auth: {
         autoRefreshToken: true,
         detectSessionInUrl: false,

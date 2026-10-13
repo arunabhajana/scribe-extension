@@ -502,7 +502,7 @@ export function SettingsView({
               })}
             </SettingsCard>
             <SettingsCard title="Signed-in devices" subtitle="Sign-in sessions associated with your account." accent={current.color}>
-              <SignedInDevices inventory={deviceInventory} dark={dark} accent={current.color} />
+              <SignedInDevices inventory={deviceInventory} dark={dark} accent={current.color} onMessage={onMessage} />
             </SettingsCard>
           </>
         )}

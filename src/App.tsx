@@ -10,10 +10,11 @@ import { AuthView } from "./components/AuthView";
 import { MfaChallengeView } from "./components/mfa/MfaChallengeView";
 import { useMfa } from "./hooks/useMfa";
 import { useDeviceSessions } from "./hooks/useDeviceSessions";
+import { useSessionGuard } from "./hooks/useSessionGuard";
 import { ContextMenu, type ContextMenuItem } from "./components/ContextMenu";
 import { noteFontFamilies, noteFontFamilyCss, noteFontSizes, type NoteFontFamily, type NoteFontSize } from "./data/noteFontSizes";
 import type { Folder, Note, Screen } from "./types";
-import { supabase } from "./lib/supabase";
+import { authStorageKey, supabase } from "./lib/supabase";
 import { completeOAuthCallback, linkProviderIdentity, oauthCallbackStorageKey, signInWithProvider as startProviderSignIn, type SocialProvider } from "./lib/oauth";
 import { loadAccount, syncAccount, updateAccountCache, type AccountCache } from "./data/cloudSync";
 
@@ -97,6 +98,38 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState<"pending" | "syncing" | "synced" | "error">("synced");
   const [filterPinned, setFilterPinned] = useState(false);
   const [message, setMessage] = useState("");
+  const handleRevokedSession = useCallback(async (notice: string) => {
+    const ownerId = authUserIdRef.current;
+    const noteSnapshot = notesRef.current;
+    const folderSnapshot = foldersRef.current;
+    const preserveSnapshot = ownerId && accountCache.current?.userId === ownerId;
+    setAuthLoading(true);
+    setAuthSession(null);
+    setProfileOpen(false);
+    setScreen("auth");
+    setAuthError("");
+    if (preserveSnapshot) {
+      try {
+        await cacheWriteChain.current;
+        while (syncRunning.current) await new Promise((resolve) => window.setTimeout(resolve, 100));
+        const cache = await loadAccount(ownerId);
+        await updateAccountCache(cache, noteSnapshot, folderSnapshot);
+      } catch { setAuthError("This session was signed out, but your latest edits could not be saved locally."); }
+    }
+    try {
+      const result = await supabase?.auth.signOut({ scope: "local" });
+      if (result?.error) {
+        if (typeof chrome !== "undefined" && chrome.storage?.local) await chrome.storage.local.remove(authStorageKey);
+        else localStorage.removeItem(authStorageKey);
+      }
+    } catch {
+      try {
+        if (typeof chrome !== "undefined" && chrome.storage?.local) await chrome.storage.local.remove(authStorageKey);
+        else localStorage.removeItem(authStorageKey);
+      } catch { setAuthError("This session was signed out. Reopen the extension if local session cleanup failed."); }
+    } finally { setMessage(notice); setAuthLoading(false); }
+  }, []);
+  useSessionGuard(authSession, handleRevokedSession);
   const mfaNotice = mfa.notice;
   const clearMfaNotice = mfa.clearNotice;
   useEffect(() => {
